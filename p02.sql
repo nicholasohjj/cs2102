@@ -1,3 +1,4 @@
+--Ricco test push and pull request
 create table p02.customers
 (
     email   text    not null
