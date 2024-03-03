@@ -111,6 +111,47 @@ create table p02.cardetails
 alter table p02.cardetails
     owner to postgres;
 
+/*
+each cardetail may be assigned to at least 0 booking: true, a cardetail in cardetails table 
+need not be in assigns
+
+each cardetail may be assigned to more than 1 booking: true, (bid, plate) and (bid1, plate) can exist
+since the primary key is bid
+
+cannot be double booked: has to be implemented with a trigger -- not enforced by the schema
+
+no entry in handover before assigns: true, assigns being referenced table from handover
+means we cannot insert into handover, if the bid, plate is not in assigns
+
+
+*/
+create table p02.assigns
+(
+    bid   text primary key
+        references p02.bookings(bid),
+    plate text    not null
+        references p02.cardetails(plate)
+    
+);
+
+alter table p02.assigns
+    owner to postgres;
+
+/*
+cannot be associated with multiple same bid: 
+*/
+create table p02.handover
+(
+    bid   text,
+    plate text,
+    eid   text references p02.employees(eid),
+    primary key(bid, plate, eid),
+    foreign key(bid, plate) references p02.assigns(bid, plate)
+        on update cascade on delete cascade
+);
+
+alter table p02.handover
+    owner to postgres;
 
 /*
 must have exactly 1 carmodel: key-total r/s enforced as car_brand and car_model cannot be null. 
