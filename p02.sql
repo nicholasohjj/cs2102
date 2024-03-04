@@ -1,102 +1,115 @@
-create table p02.customers
+create table customers
 (
-    email   text    not null
+    email   varchar not null
         primary key,
-    address text    not null,
+    fsname  varchar,
+    lsname  varchar not null,
+    address varchar not null,
     dob     date    not null
         constraint customers_dob_check
             check (dob < CURRENT_DATE),
-    phone   text    not null
-        unique,
-    fsname  text,
-    lsname  text    not null,
-    name    text generated always as (((fsname || ' '::text) || lsname)) stored,
-    age     integer not null
+    phone   varchar not null
 );
 
-alter table p02.customers
+alter table customers
     owner to postgres;
 
-create table p02.locations
+create table locations
 (
-    zip   text not null,
-    lname text not null,
-    laddr text not null,
-    primary key (zip, lname)
-);
-
-alter table p02.locations
-    owner to postgres;
-
-create table p02.employees
-(
-    eid    text not null
+    zip   varchar not null
         primary key,
-    ename  text not null,
-    ephone text not null
+    lname varchar not null
+        unique,
+    laddr varchar not null
 );
 
-alter table p02.employees
+alter table locations
     owner to postgres;
 
-create table p02.drivers
+create table employees
 (
-    eid  text not null,
-    pdvl text not null,
-    primary key (eid, pdvl)
+    eid          serial
+        primary key,
+    ename        varchar not null,
+    ephone       varchar not null,
+    location_zip varchar not null
+        references locations
 );
 
-alter table p02.drivers
+alter table employees
     owner to postgres;
 
-create table p02.carmodels
+create table drivers
 (
-    brand    text    not null,
-    model    text    not null,
-    capacity integer not null
-        constraint carmodels_capacity_check
-            check (capacity > 0),
-    deposit  integer not null
-        constraint carmodels_deposit_check
-            check (deposit >= 0),
-    daily    integer not null
-        constraint carmodels_daily_check
-            check (daily > 0),
+    eid  integer not null
+        primary key
+        references employees
+            on delete cascade,
+    pdvl varchar not null
+        unique
+);
+
+alter table drivers
+    owner to postgres;
+
+create table carmodels
+(
+    brand    varchar not null,
+    model    varchar not null,
+    capacity integer not null,
+    deposit  numeric not null,
+    daily    numeric not null,
     primary key (brand, model)
 );
 
-alter table p02.carmodels
+alter table carmodels
     owner to postgres;
 
-create table p02.cardetails
+create table cardetails
 (
-    plate text    not null
+    plate        varchar not null
         primary key,
-    color text    not null,
-    pyear integer not null
+    color        varchar not null,
+    pyear        integer not null,
+    model_brand  varchar not null,
+    model_model  varchar not null,
+    location_zip varchar not null
+        references locations,
+    foreign key (model_brand, model_model) references carmodels
+        on delete cascade
 );
 
-alter table p02.cardetails
+alter table cardetails
     owner to postgres;
 
-create table p02.bookings
+create table bookings
 (
-    bid   text    not null
+    bid            serial
         primary key,
-    sdate date    not null,
-    days  integer not null
-        constraint bookings_days_check
-            check (days >= 0),
-    ccnum bigint  not null,
-    bdate date    not null,
-    cost  integer
-        constraint bookings_cost_check
-            check (cost >= 0),
-    edate date generated always as ((sdate + ((days)::double precision * '1 day'::interval))) stored,
+    sdate          date    not null,
+    days           integer not null,
+    ccnum          varchar not null,
+    bdate          date    not null,
+    cost           numeric
+        constraint lol
+            check (cost >= (0)::numeric),
+    edate          date generated always as ((sdate + ((days)::double precision * '1 day'::interval))) stored,
+    customer_email varchar not null
+        references customers,
+    location_zip   varchar not null
+        references locations,
+    car_plate      varchar
+        references cardetails,
+    handover_eid   integer
+        references employees,
+    employee_eid   integer
+        references employees,
+    driver_eid     integer
+        references drivers,
     constraint bookings_check
         check (bdate < sdate)
 );
 
-alter table p02.bookings
+alter table bookings
     owner to postgres;
 
