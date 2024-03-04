@@ -85,10 +85,10 @@ alter table p02.carmodels
     owner to postgres;
 
 /*
-Must be a detail for exactly 1 car model: true, as both car_brand and car_model cannot be null
+Must be a detail for exactly 1 car model: true, for every plate, both car_brand and car_model cannot be null
 if a car model does not exist, the car cannot exist
 
-Must be parked at exactly 1 location: true, as both location_zip and location_lname cannot be null
+Must be parked at exactly 1 location: true, as for every plate,both location_zip and location_lname cannot be null
 
 */
 create table p02.cardetails
@@ -121,7 +121,7 @@ since the primary key is bid
 cannot be double booked: has to be implemented with a trigger -- not enforced by the schema
 
 no entry in handover before assigns: true, assigns being referenced table from handover
-means we cannot insert into handover, if the bid, plate is not in assigns
+means we cannot insert into handover, if the bid is not in assigns
 
 
 */
@@ -138,20 +138,130 @@ alter table p02.assigns
     owner to postgres;
 
 /*
-cannot be associated with multiple same bid: 
+no entry in handover before assigns: enforced with the foreign key constraint in handover
+
+same eid can handle different handovers with different bid: true, because primary key is bid
+
+there cannot be 2 same eid doing the same handover: true, as bid is the primary key 
+
 */
 create table p02.handover
 (
     bid   text,
-    plate text,
     eid   text references p02.employees(eid),
-    primary key(bid, plate, eid),
-    foreign key(bid, plate) references p02.assigns(bid, plate)
+    primary key(bid),
+    foreign key(bid) references p02.assigns(bid)
         on update cascade on delete cascade
 );
 
 alter table p02.handover
     owner to postgres;
+
+/*
+can use different ccnum compared to booking: true, as no constraint on ccnum
+can only be added after handover: enforced with foreign key constraint
+*/
+create table p02.returned
+(
+    ccnum integer not null,
+    cost money not null,
+    bid   text,
+    eid   text references p02.employees(eid),
+    primary key(bid),
+    foreign key(bid) references p02.handover(bid)
+        on update cascade on delete cascade
+);
+
+alter table p02.returned
+    owner to postgres;
+
+/*
+Car details handover must be by the same employee working in the same location as specified in bookings
+*/
+
+create table p02.cardetails
+(
+    plate text    not null
+        primary key,
+    color text    not null,
+    pyear integer not null
+        constraint cardetails_pyear_check
+            check (pyear > 0),
+    car_brand text not null,
+    car_model text not null,
+    foreign key(car_brand, car_model) references p02.carmodels(brand, model)
+        on update cascade on delete cascade,
+    location_zip text not null,
+    location_lname text not null,
+    foreign key(location_zip, location_lname) references p02.locations(zip, lname)
+);
+
+alter table p02.cardetails
+    owner to postgres;
+
+/*
+each cardetail may be assigned to at least 0 booking: true, a cardetail in cardetails table 
+need not be in assigns
+
+each cardetail may be assigned to more than 1 booking: true, (bid, plate) and (bid1, plate) can exist
+since the primary key is bid
+
+cannot be double booked: has to be implemented with a trigger -- not enforced by the schema
+
+no entry in handover before assigns: true, assigns being referenced table from handover
+means we cannot insert into handover, if the bid is not in assigns
+
+
+*/
+create table p02.assigns
+(
+    bid   text primary key
+        references p02.bookings(bid),
+    plate text    not null
+        references p02.cardetails(plate)
+    
+);
+
+alter table p02.assigns
+    owner to postgres;
+
+/*
+no entry in handover before assigns: enforced with the foreign key constraint in handover
+
+same eid can handle different handovers with different bid: true, because primary key is bid
+
+there cannot be 2 same eid doing the same handover: true, as bid is the primary key 
+
+*/
+create table p02.handover
+(
+    bid   text,
+    eid   text references p02.employees(eid),    
+    primary key(bid),
+    foreign key(bid) references p02.assigns(bid)
+        on update cascade on delete cascade
+);
+
+alter table p02.handover
+    owner to postgres;
+
+/*
+
+*/
+create table p02.returned
+(
+    ccnum integer,
+    cost money,
+    bid   text,
+    eid   text references p02.employees(eid),
+    primary key(bid),
+    foreign key(bid) references p02.handover(bid)
+        on update cascade on delete cascade
+);
+
+alter table p02.handover
+    owner to postgres;
+
 
 /*
 must have exactly 1 carmodel: key-total r/s enforced as car_brand and car_model cannot be null. 
