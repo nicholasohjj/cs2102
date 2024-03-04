@@ -102,11 +102,11 @@ create table p02.cardetails
             check (pyear > 0),
     car_brand text not null,
     car_model text not null,
-    foreign key(car_brand, car_model) references p02.carmodels(brand, model)
+    constraint fk_cardetails_carmodels foreign key(car_brand, car_model) references p02.carmodels(brand, model)
         on update cascade on delete cascade,
     location_zip text not null,
     location_lname text not null,
-    foreign key(location_zip, location_lname) references p02.locations(zip, lname)
+    constraint fk_cardetails_locations foreign key(location_zip, location_lname) references p02.locations(zip, lname)
 );
 
 alter table p02.cardetails
@@ -118,7 +118,7 @@ must have exactly 1 carmodel: key-total r/s enforced as car_brand and car_model 
 */
 create table p02.bookings
 (
-    bid   text    not null
+    bid   integer    not null
         primary key,
     sdate date    not null,
     days  integer not null
@@ -134,7 +134,7 @@ create table p02.bookings
         check (bdate < sdate),
     car_brand text not null,
     car_model text not null,
-    foreign key(car_brand, car_model) references p02.carmodels(brand, model)
+    constraint fk_bookings_carmodel foreign key(car_brand, car_model) references p02.carmodels(brand, model)
 );
 
 alter table p02.bookings
@@ -153,11 +153,11 @@ cannot be double booked: has to be implemented with a trigger -- not enforced by
 no entry in handover before assigns: true, assigns being referenced table from handover
 means we cannot insert into handover, if the bid is not in assigns
 
-
+cardetail in assigns should match car model in bookings: not enforced in schema
 */
 create table p02.assigns
 (
-    bid   text primary key
+    bid   integer primary key
         references p02.bookings(bid),
     plate text    not null
         references p02.cardetails(plate)
@@ -177,10 +177,10 @@ there cannot be 2 same eid doing the same handover: true, as bid is the primary 
 */
 create table p02.handover
 (
-    bid   text,
+    bid   integer,
     eid   text references p02.employees(eid),
     primary key(bid),
-    foreign key(bid) references p02.assigns(bid)
+    constraint fk_handover_assigns foreign key(bid) references p02.assigns(bid)
         on update cascade on delete cascade
 );
 
@@ -195,10 +195,10 @@ create table p02.returned
 (
     ccnum integer not null,
     cost money not null,
-    bid   text,
+    bid   integer,
     eid   text references p02.employees(eid),
     primary key(bid),
-    foreign key(bid) references p02.handover(bid)
+    constraint fk_returned_handover foreign key(bid) references p02.handover(bid)
         on update cascade on delete cascade
 );
 
