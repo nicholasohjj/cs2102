@@ -49,6 +49,7 @@ create table p02.drivers
 alter table p02.drivers
     owner to postgres;
 
+
 /*
 r/s with bookings implemented with key-total r/s:
 - May be rented by at least 0 bookings: true, can add to carmodels without adding to 
@@ -110,6 +111,35 @@ create table p02.cardetails
 
 alter table p02.cardetails
     owner to postgres;
+
+
+/*
+must have exactly 1 carmodel: key-total r/s enforced as car_brand and car_model cannot be null. 
+*/
+create table p02.bookings
+(
+    bid   text    not null
+        primary key,
+    sdate date    not null,
+    days  integer not null
+        constraint bookings_days_check
+            check (days >= 0),
+    ccnum bigint  not null,
+    bdate date    not null,
+    cost  integer
+        constraint bookings_cost_check
+            check (cost >= 0),
+    edate date generated always as ((sdate + ((days)::double precision * '1 day'::interval))) stored,
+    constraint bookings_check
+        check (bdate < sdate),
+    car_brand text not null,
+    car_model text not null,
+    foreign key(car_brand, car_model) references p02.carmodels(brand, model)
+);
+
+alter table p02.bookings
+    owner to postgres;
+
 
 /*
 each cardetail may be assigned to at least 0 booking: true, a cardetail in cardetails table 
@@ -174,31 +204,3 @@ create table p02.returned
 
 alter table p02.returned
     owner to postgres;
-
-/*
-must have exactly 1 carmodel: key-total r/s enforced as car_brand and car_model cannot be null. 
-*/
-create table p02.bookings
-(
-    bid   text    not null
-        primary key,
-    sdate date    not null,
-    days  integer not null
-        constraint bookings_days_check
-            check (days >= 0),
-    ccnum bigint  not null,
-    bdate date    not null,
-    cost  integer
-        constraint bookings_cost_check
-            check (cost >= 0),
-    edate date generated always as ((sdate + ((days)::double precision * '1 day'::interval))) stored,
-    constraint bookings_check
-        check (bdate < sdate),
-    car_brand text not null,
-    car_model text not null,
-    foreign key(car_brand, car_model) references p02.carmodels(brand, model)
-);
-
-alter table p02.bookings
-    owner to postgres;
-
