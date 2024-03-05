@@ -114,16 +114,15 @@ alter table p02.cardetails
     owner to postgres;
 
 CREATE TABLE bookings(
-    bid TEXT NOT NULL PRIMARY KEY,
+    bid INT NOT NULL PRIMARY KEY,
     sdate DATE NOT NULL /*CONSTRAINT bookings_bdate_sdate_check*/ CHECK (sdate > bdate), -- not sure whether makes a diff but I thought should check sdate > bdate rather than bdate < sdate which is the same but more like the booking is "automatically" recorded and cannot be changed but sdate can 'amend' according to customer
     days INT NOT NULL /*CONSTRAINT bookings_days_check*/ CHECK (days >= 0),
-    edate DATE GENERATED ALWAYS AS ((sdate + ((5)/*::double precision * '1 day'::interval*/))) STORED, 
+    edate DATE GENERATED ALWAYS AS ((sdate + ((days)/*::double precision * '1 day'::interval*/))) STORED, 
     -- I dont think the double precision * '1 days' is required? I tried SELECT (CURRENT_DATE + ((SomeRandomNumber])::double precision * '1 day'::interval)); 
     -- and it's the same as without the typecasting * 1 day except it adds time too? Idk up to yall
 
     ccnum TEXT NOT NULL, -- Changed from BIGINT to TEXT in case ccnum starts w 0
     bdate DATE NOT NULL,
-
     -- ensure at most & at least 1 customer / total & key participation
     email TEXT NOT NULL REFERENCES customers (email), 
 
