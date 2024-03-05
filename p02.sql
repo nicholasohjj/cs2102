@@ -12,7 +12,7 @@ create table p02.customers
     fsname  text,
     lsname  text    not null,
     name    text generated always as (((fsname || ' '::text) || lsname)) stored,
-    age     integer not null
+    age     int
 );
 
 alter table p02.customers
@@ -20,10 +20,10 @@ alter table p02.customers
 
 create table p02.locations
 (
-    zip   text not null,
+    zip   text,
     lname text not null,
     laddr text not null,
-    primary key (zip, lname)
+    primary key (zip)
 );
 
 alter table p02.locations
