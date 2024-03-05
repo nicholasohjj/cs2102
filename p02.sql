@@ -122,7 +122,8 @@ CREATE TABLE bookings(
     -- and it's the same as without the typecasting * 1 day except it adds time too? Idk up to yall
 
     ccnum TEXT NOT NULL, -- Changed from BIGINT to TEXT in case ccnum starts w 0
-    bdate DATE NOT NULL,
+    bdate DATE NOT NULL DEFAULT CURRENT_DATE,
+
     -- ensure at most & at least 1 customer / total & key participation
     email TEXT NOT NULL REFERENCES customers (email), 
 
@@ -135,28 +136,7 @@ CREATE TABLE bookings(
     /*CONSTRAINT bookings_car*/ FOREIGN KEY (brand, model) REFERENCES carmodels (brand, model),
 
     -- 1 location...?? actually is this required? Since car detail has location
-    zip TEXT,
-    lname TEXT, -- why is lname part of the composite key in location wadafaq zip not enough?
-    /*CONSTRAINT bookings_location*/ FOREIGN KEY (zip, lname) REFERENCES locations (zip, lname),
-
-    -- 0/1 driver
-    eid TEXT,
-    pdvl TEXT,
-    fromdate DATE CHECK (fromdate > sdate),
-    todate DATE CHECK (todate < edate),
-    /*CONSTRAINT bookings_driver*/ FOREIGN KEY (eid, pdvl) REFERENCES drivers (eid, pdvl),
-
-    --Not null because might not know which employee?
-    handovereid TEXT REFERENCES employees (eid), 
-    returneid TEXT REFERENCES employees (eid), 
-
-    --Not sure whether need to have cost as attribute?? idts right wadafaq but I just put
-    deposit INT,
-    daily INT,
-    cost INT GENERATED ALWAYS AS (deposit + daily*days) STORED
-
-    --Optional constraint for creditcard?
-    ,CONSTRAINT bookings_cc_requirement CHECK (cost < 0)
+    zip TEXT NOT NULL REFERENCES p02.locations (zip)
 );
 
 alter table p02.bookings
