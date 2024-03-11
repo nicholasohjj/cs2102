@@ -142,35 +142,9 @@ CREATE TABLE bookings(
 alter table p02.bookings
     owner to postgres;
 
-
 /*
-each cardetail may be assigned to at least 0 booking: true, a cardetail in cardetails table 
-need not be in assigns
-
-each cardetail may be assigned to more than 1 booking: true, (bid, plate) and (bid1, plate) can exist
-since the primary key is bid
-
-cannot be double booked: has to be implemented with a trigger -- not enforced by the schema
-
-no entry in handover before assigns: true, assigns being referenced table from handover
-means we cannot insert into handover, if the bid is not in assigns
-
-cardetail in assigns should match car model in bookings: not enforced in schema
-*/
-create table p02.assigns
-(
-    bid   integer primary key
-        references p02.bookings(bid),
-    plate text    not null
-        references p02.cardetails(plate)
-    
-);
-
-alter table p02.assigns
-    owner to postgres;
-
-/*
-no entry in handover before assigns: enforced with the foreign key constraint in handover
+no entry in handover before assigns: enforced with the foreign key constraint in handover.
+note that assigns is implemented in bookings itself with the plate column.
 
 same eid can handle different handovers with different bid: true, because primary key is bid
 
@@ -182,7 +156,7 @@ create table p02.handover
     bid   integer,
     eid   text references p02.employees(eid),
     primary key(bid),
-    constraint fk_handover_assigns foreign key(bid) references p02.assigns(bid)
+    constraint fk_handover_booking foreign key(bid) references p02.bookings(bid)
         on update cascade on delete cascade
 );
 
