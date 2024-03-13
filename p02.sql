@@ -1,4 +1,3 @@
---Ricco test Git Branch Push
 create table p02.customers
 (
     email   text    not null
