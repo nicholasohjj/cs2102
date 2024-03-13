@@ -12,10 +12,10 @@ create table p02.customers
     fsname  text,
     lsname  text    not null,
     name    text generated always as (((fsname || ' '::text) || lsname)) stored,
-    age     INT GENERATED ALWAYS AS 
-            (
-                EXTRACT(YEAR FROM age(CURRENT_DATE, dob))::INT
-            ) STORED);
+    age     INT GENERATED ALWAYS AS (
+    DATE_PART('year', AGE(CURRENT_DATE, dob))
+) STORED;
+);
 
 alter table p02.customers
     owner to postgres;
