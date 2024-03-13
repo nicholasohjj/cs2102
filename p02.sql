@@ -1,4 +1,4 @@
-create table p02.customers
+create table customers
 (
     email   text    not null
         primary key,
@@ -14,7 +14,7 @@ create table p02.customers
     age     int
 );
 
-alter table p02.customers
+alter table customers
     owner to postgres;
 
 create table locations
@@ -25,10 +25,10 @@ create table locations
     primary key (zip)
 );
 
-alter table p02.locations
+alter table locations
     owner to postgres;
 
-create table p02.employees
+create table employees
 (
     eid    text not null
         primary key,
@@ -36,7 +36,7 @@ create table p02.employees
     ephone text not null
 );
 
-alter table p02.employees
+alter table employees
     owner to postgres;
 
 create table drivers
@@ -46,7 +46,7 @@ create table drivers
     UNIQUE (pdvl)
 );
 
-alter table p02.drivers
+alter table drivers
     owner to postgres;
 
 
@@ -66,7 +66,7 @@ cardetails because they are seperate tables
 May have more than 1 car details:true, multiple rows in cardetails can have the same
 car models (foreign key values do not have to be unique)
 */
-create table p02.carmodels
+create table carmodels
 (
     brand    text    not null,
     model    text    not null,
@@ -82,7 +82,7 @@ create table p02.carmodels
     primary key (brand, model)
 );
 
-alter table p02.carmodels
+alter table carmodels
     owner to postgres;
 
 /*
@@ -92,7 +92,7 @@ if a car model does not exist, the car cannot exist
 Must be parked at exactly 1 location: true, as for every plate,both location_zip and location_lname cannot be null
 
 */
-create table p02.cardetails
+create table cardetails
 (
     plate text    not null
         primary key,
@@ -102,13 +102,13 @@ create table p02.cardetails
             check (pyear > 0),
     car_brand text not null,
     car_model text not null,
-    constraint fk_cardetails_carmodels foreign key(car_brand, car_model) references p02.carmodels(brand, model)
+    constraint fk_cardetails_carmodels foreign key(car_brand, car_model) references carmodels(brand, model)
         on update cascade on delete cascade,
     location_zip text not null,
-    constraint fk_cardetails_locations foreign key(location_zip) references p02.locations(zip)
+    constraint fk_cardetails_locations foreign key(location_zip) references locations(zip)
 );
 
-alter table p02.cardetails
+alter table cardetails
     owner to postgres;
 
 CREATE TABLE bookings(
@@ -134,10 +134,10 @@ CREATE TABLE bookings(
     /*CONSTRAINT bookings_car*/ FOREIGN KEY (brand, model) REFERENCES carmodels (brand, model),
 
     -- 1 location...?? actually is this required? Since car detail has location
-    zip TEXT NOT NULL REFERENCES p02.locations (zip)
+    zip TEXT NOT NULL REFERENCES locations (zip)
 );
 
-alter table p02.bookings
+alter table bookings
     owner to postgres;
 
 /*
@@ -149,40 +149,40 @@ same eid can handle different handovers with different bid: true, because primar
 there cannot be 2 same eid doing the same handover: true, as bid is the primary key 
 
 */
-create table p02.handover
+create table handover
 (
     bid   integer,
-    eid   text references p02.employees(eid),
-    plate TEXT NOT NULL references p02.bookings (plate),
+    eid   text references employees(eid),
     primary key(bid),
-    constraint fk_handover_booking foreign key(bid) references p02.bookings(bid)
+    constraint fk_handover_booking foreign key(bid) references bookings(bid)
         on update cascade on delete cascade
 );
 
-alter table p02.handover
+alter table handover
     owner to postgres;
 
 /*
 can use different ccnum compared to booking: true, as no constraint on ccnum
 can only be added after handover: enforced with foreign key constraint
 */
-create table p02.returned
+create table returned
 (
-    ccnum integer CHECK (cost >= 0),
-    cost money not null,
+    ccnum integer, 
+    cost float not null,
     bid   integer,
-    eid   text references p02.employees(eid),
+    eid   text references employees(eid),
     primary key(bid),
-    constraint fk_returned_handover foreign key(bid) references p02.handover(bid)
-        on update cascade on delete cascade
+    constraint fk_returned_handover foreign key(bid) references handover(bid)
+        on update cascade on delete cascade,
     FOREIGN KEY(eid) REFERENCES Employees(eid),
-    FOREIGN KEY(bid) REFERENCES Bookings(bid)
+    FOREIGN KEY(bid) REFERENCES Bookings(bid),
+    CONSTRAINT return_ccnum_cost CHECK ((cost > 0 and ccnum IS NOT NULL) or (cost = 0))
 );
 
-alter table p02.returned
+alter table returned
     owner to postgres;
 
-create table p02.works(
+create table works(
     eid text primary key,
     zip text NOT NULL,
     FOREIGN KEY(eid) REFERENCES Employees(eid),
@@ -192,7 +192,7 @@ create table p02.works(
 
 
 
-CREATE TABLE p02.Hires(
+CREATE TABLE Hires(
     bid INT PRIMARY KEY,
     eid TEXT NOT NULL,
     fromdate DATE NOT NULL,
