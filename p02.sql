@@ -114,7 +114,7 @@ create table p02.cardetails
 alter table p02.cardetails
     owner to postgres;
 
-CREATE TABLE bookings(
+CREATE TABLE p02.bookings(
     bid INT NOT NULL PRIMARY KEY,
     sdate DATE NOT NULL /*CONSTRAINT bookings_bdate_sdate_check*/ CHECK (sdate > bdate), -- not sure whether makes a diff but I thought should check sdate > bdate rather than bdate < sdate which is the same but more like the booking is "automatically" recorded and cannot be changed but sdate can 'amend' according to customer
     days INT NOT NULL /*CONSTRAINT bookings_days_check*/ CHECK (days >= 0),
@@ -190,40 +190,11 @@ create table p02.works(
     FOREIGN KEY(eid) REFERENCES Employees(eid),
     FOREIGN KEY(zip) REFERENCES Locations(zip),
     unique(zip)    
-)
+);
 
-CREATE TABLE Hires(
-    bid INT PRIMARY KEY,
-    eid TEXT NOT NULL,
-    fromdate DATE NOT NULL,
-    todate DATE NOT NULL,
-    CHECK (todate >= fromdate),
-    CHECK (
-        fromdate > (
-            SELECT
-                sdate
-            FROM
-                Booking
-            WHERE
-                booking_id = Hires.booking_id
-        )
-    ),
-    CHECK (
-        todate < (
-            SELECT
-                edate
-            FROM
-                Booking
-            WHERE
-                booking_id = Hires.booking_id
-        )
-    ),
-    ccnum TEXT NOT NULL,
-    FOREIGN KEY(eid) REFERENCES Employees(eid),
-    FOREIGN KEY(bid) REFERENCES Bookings(bid),
-) 
 
-CREATE TABLE Hires(
+
+CREATE TABLE p02.Hires(
     bid INT PRIMARY KEY,
     eid TEXT NOT NULL,
     fromdate DATE NOT NULL,
@@ -250,7 +221,7 @@ CREATE TABLE Hires(
         )
     ),
     ccnum TEXT NOT NULL,
-    FOREIGN KEY(eid) REFERENCES Employees(eid),
-    FOREIGN KEY(bid) REFERENCES Bookings(bid),
-) 
+    FOREIGN KEY(eid) REFERENCES p02.Employees(eid),
+    FOREIGN KEY(bid) REFERENCES p02.Bookings(bid),
+);
 
