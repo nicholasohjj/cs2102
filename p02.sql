@@ -44,8 +44,7 @@ create table p02.drivers
 (
     eid  text not null,
     pdvl text not null,
-    primary key (eid, pdvl),
-    UNIQUE (pdvl)
+    primary key (eid, pdvl)
 );
 
 alter table p02.drivers
@@ -114,7 +113,7 @@ create table p02.cardetails
 alter table p02.cardetails
     owner to postgres;
 
-CREATE TABLE p02.bookings(
+CREATE TABLE bookings(
     bid INT NOT NULL PRIMARY KEY,
     sdate DATE NOT NULL /*CONSTRAINT bookings_bdate_sdate_check*/ CHECK (sdate > bdate), -- not sure whether makes a diff but I thought should check sdate > bdate rather than bdate < sdate which is the same but more like the booking is "automatically" recorded and cannot be changed but sdate can 'amend' according to customer
     days INT NOT NULL /*CONSTRAINT bookings_days_check*/ CHECK (days >= 0),
@@ -143,9 +142,35 @@ CREATE TABLE p02.bookings(
 alter table p02.bookings
     owner to postgres;
 
+
 /*
-no entry in handover before assigns: enforced with the foreign key constraint in handover.
-note that assigns is implemented in bookings itself with the plate column.
+each cardetail may be assigned to at least 0 booking: true, a cardetail in cardetails table 
+need not be in assigns
+
+each cardetail may be assigned to more than 1 booking: true, (bid, plate) and (bid1, plate) can exist
+since the primary key is bid
+
+cannot be double booked: has to be implemented with a trigger -- not enforced by the schema
+
+no entry in handover before assigns: true, assigns being referenced table from handover
+means we cannot insert into handover, if the bid is not in assigns
+
+cardetail in assigns should match car model in bookings: not enforced in schema
+*/
+create table p02.assigns
+(
+    bid   integer primary key
+        references p02.bookings(bid),
+    plate text    not null
+        references p02.cardetails(plate)
+    
+);
+
+alter table p02.assigns
+    owner to postgres;
+
+/*
+no entry in handover before assigns: enforced with the foreign key constraint in handover
 
 same eid can handle different handovers with different bid: true, because primary key is bid
 
@@ -157,7 +182,7 @@ create table p02.handover
     bid   integer,
     eid   text references p02.employees(eid),
     primary key(bid),
-    constraint fk_handover_booking foreign key(bid) references p02.bookings(bid)
+    constraint fk_handover_assigns foreign key(bid) references p02.assigns(bid)
         on update cascade on delete cascade
 );
 
@@ -170,58 +195,14 @@ can only be added after handover: enforced with foreign key constraint
 */
 create table p02.returned
 (
-    ccnum integer not null  CHECK (cost >= 0),
+    ccnum integer not null,
     cost money not null,
     bid   integer,
     eid   text references p02.employees(eid),
     primary key(bid),
     constraint fk_returned_handover foreign key(bid) references p02.handover(bid)
         on update cascade on delete cascade
-    FOREIGN KEY(eid) REFERENCES Employees(eid),
-    FOREIGN KEY(bid) REFERENCES Bookings(bid)
 );
 
 alter table p02.returned
     owner to postgres;
-
-create table p02.works(
-    eid text primary key,
-    zip text NOT NULL,
-    FOREIGN KEY(eid) REFERENCES Employees(eid),
-    FOREIGN KEY(zip) REFERENCES Locations(zip),
-    unique(zip)    
-);
-
-
-
-CREATE TABLE p02.Hires(
-    bid INT PRIMARY KEY,
-    eid TEXT NOT NULL,
-    fromdate DATE NOT NULL,
-    todate DATE NOT NULL,
-    CHECK (todate >= fromdate),
-    CHECK (
-        fromdate > (
-            SELECT
-                sdate
-            FROM
-                bookings
-            WHERE
-                bid = Hires.bid
-        )
-    ),
-    CHECK (
-        todate < (
-            SELECT
-                edate
-            FROM
-                bookings
-            WHERE
-                bid = Hires.bid
-        )
-    ),
-    ccnum TEXT NOT NULL,
-    FOREIGN KEY(eid) REFERENCES p02.Employees(eid),
-    FOREIGN KEY(bid) REFERENCES p02.Bookings(bid),
-);
-
