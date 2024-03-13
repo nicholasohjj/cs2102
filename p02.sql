@@ -187,10 +187,13 @@ alter table p02.returned
 create table p02.works(
     eid text primary key,
     zip text NOT NULL,
-    FOREIGN KEY(eid) REFERENCES Employees(eid),
-    FOREIGN KEY(zip) REFERENCES Locations(zip),
+    FOREIGN KEY(eid) REFERENCES p02.Employees(eid),
+    FOREIGN KEY(zip) REFERENCES p02.Locations(zip),
     unique(zip)    
 );
+
+alter table p02.works
+    owner to postgres;
 
 
 
@@ -205,7 +208,7 @@ CREATE TABLE p02.Hires(
             SELECT
                 sdate
             FROM
-                bookings
+                p02.bookings
             WHERE
                 bid = Hires.bid
         )
@@ -215,7 +218,7 @@ CREATE TABLE p02.Hires(
             SELECT
                 edate
             FROM
-                bookings
+                p02.bookings
             WHERE
                 bid = Hires.bid
         )
@@ -225,3 +228,5 @@ CREATE TABLE p02.Hires(
     FOREIGN KEY(bid) REFERENCES p02.Bookings(bid),
 );
 
+alter table p02.Hires
+    owner to postgres;
