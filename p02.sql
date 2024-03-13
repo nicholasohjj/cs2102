@@ -44,7 +44,8 @@ create table p02.drivers
 (
     eid  text not null,
     pdvl text not null,
-    primary key (eid, pdvl)
+    primary key (eid, pdvl),
+    UNIQUE (pdvl)
 );
 
 alter table p02.drivers
@@ -169,14 +170,87 @@ can only be added after handover: enforced with foreign key constraint
 */
 create table p02.returned
 (
-    ccnum integer not null,
+    ccnum integer not null  CHECK (cost >= 0),
     cost money not null,
     bid   integer,
     eid   text references p02.employees(eid),
     primary key(bid),
     constraint fk_returned_handover foreign key(bid) references p02.handover(bid)
         on update cascade on delete cascade
+    FOREIGN KEY(eid) REFERENCES Employees(eid),
+    FOREIGN KEY(bid) REFERENCES Bookings(bid)
 );
 
 alter table p02.returned
     owner to postgres;
+
+create table p02.works(
+    eid text primary key,
+    zip text NOT NULL,
+    FOREIGN KEY(eid) REFERENCES Employees(eid),
+    FOREIGN KEY(zip) REFERENCES Locations(zip),
+    unique(zip)    
+)
+
+CREATE TABLE Hires(
+    bid INT PRIMARY KEY,
+    eid TEXT NOT NULL,
+    fromdate DATE NOT NULL,
+    todate DATE NOT NULL,
+    CHECK (todate >= fromdate),
+    CHECK (
+        fromdate > (
+            SELECT
+                sdate
+            FROM
+                Booking
+            WHERE
+                booking_id = Hires.booking_id
+        )
+    ),
+    CHECK (
+        todate < (
+            SELECT
+                edate
+            FROM
+                Booking
+            WHERE
+                booking_id = Hires.booking_id
+        )
+    ),
+    ccnum TEXT NOT NULL,
+    FOREIGN KEY(eid) REFERENCES Employees(eid),
+    FOREIGN KEY(bid) REFERENCES Bookings(bid),
+) 
+
+CREATE TABLE Hires(
+    bid INT PRIMARY KEY,
+    eid TEXT NOT NULL,
+    fromdate DATE NOT NULL,
+    todate DATE NOT NULL,
+    CHECK (todate >= fromdate),
+    CHECK (
+        fromdate > (
+            SELECT
+                sdate
+            FROM
+                bookings
+            WHERE
+                bid = Hires.bid
+        )
+    ),
+    CHECK (
+        todate < (
+            SELECT
+                edate
+            FROM
+                bookings
+            WHERE
+                bid = Hires.bid
+        )
+    ),
+    ccnum TEXT NOT NULL,
+    FOREIGN KEY(eid) REFERENCES Employees(eid),
+    FOREIGN KEY(bid) REFERENCES Bookings(bid),
+) 
+
