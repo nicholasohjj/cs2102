@@ -17,10 +17,10 @@ create table p02.customers
 alter table p02.customers
     owner to postgres;
 
-create table p02.locations
+create table locations
 (
     zip   text,
-    lname text not null,
+    lname text not null unique,
     laddr text not null,
     primary key (zip)
 );
@@ -39,11 +39,10 @@ create table p02.employees
 alter table p02.employees
     owner to postgres;
 
-create table p02.drivers
+create table drivers
 (
-    eid  text not null,
+    eid  text not null primary key references employees (eid),
     pdvl text not null,
-    primary key (eid, pdvl),
     UNIQUE (pdvl)
 );
 
@@ -106,14 +105,13 @@ create table p02.cardetails
     constraint fk_cardetails_carmodels foreign key(car_brand, car_model) references p02.carmodels(brand, model)
         on update cascade on delete cascade,
     location_zip text not null,
-    location_lname text not null,
-    constraint fk_cardetails_locations foreign key(location_zip, location_lname) references p02.locations(zip, lname)
+    constraint fk_cardetails_locations foreign key(location_zip) references p02.locations(zip)
 );
 
 alter table p02.cardetails
     owner to postgres;
 
-CREATE TABLE p02.bookings(
+CREATE TABLE bookings(
     bid INT NOT NULL PRIMARY KEY,
     sdate DATE NOT NULL /*CONSTRAINT bookings_bdate_sdate_check*/ CHECK (sdate > bdate), -- not sure whether makes a diff but I thought should check sdate > bdate rather than bdate < sdate which is the same but more like the booking is "automatically" recorded and cannot be changed but sdate can 'amend' according to customer
     days INT NOT NULL /*CONSTRAINT bookings_days_check*/ CHECK (days >= 0),
@@ -155,6 +153,7 @@ create table p02.handover
 (
     bid   integer,
     eid   text references p02.employees(eid),
+    plate TEXT NOT NULL references p02.bookings (plate),
     primary key(bid),
     constraint fk_handover_booking foreign key(bid) references p02.bookings(bid)
         on update cascade on delete cascade
@@ -169,7 +168,7 @@ can only be added after handover: enforced with foreign key constraint
 */
 create table p02.returned
 (
-    ccnum integer not null  CHECK (cost >= 0),
+    ccnum integer CHECK (cost >= 0),
     cost money not null,
     bid   integer,
     eid   text references p02.employees(eid),
@@ -199,27 +198,27 @@ CREATE TABLE p02.Hires(
     fromdate DATE NOT NULL,
     todate DATE NOT NULL,
     CHECK (todate >= fromdate),
-    CHECK (
-        fromdate > (
-            SELECT
-                sdate
-            FROM
-                bookings
-            WHERE
-                bid = Hires.bid
-        )
-    ),
-    CHECK (
-        todate < (
-            SELECT
-                edate
-            FROM
-                bookings
-            WHERE
-                bid = Hires.bid
-        )
-    ),
+    -- CHECK (
+    --     fromdate > (
+    --         SELECT
+    --             sdate
+    --         FROM
+    --             bookings
+    --         WHERE
+    --             bid = Hires.bid
+    --     )
+    -- ),
+    -- CHECK (
+    --     todate < (
+    --         SELECT
+    --             edate
+    --         FROM
+    --             bookings
+    --         WHERE
+    --             bid = Hires.bid
+    --     )
+    -- ),
     ccnum TEXT NOT NULL,
-    FOREIGN KEY(eid) REFERENCES p02.Employees(eid),
-    FOREIGN KEY(bid) REFERENCES p02.Bookings(bid),
+    FOREIGN KEY(eid) REFERENCES Employees(eid),
+    FOREIGN KEY(bid) REFERENCES Bookings(bid)
 );
