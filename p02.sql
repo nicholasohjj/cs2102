@@ -1,3 +1,15 @@
+DROP TABLE IF EXISTS customers;
+DROP TABLE IF EXISTS locations;
+DROP TABLE IF EXISTS employees;
+DROP TABLE IF EXISTS drivers;
+DROP TABLE IF EXISTS carmodels;
+DROP TABLE IF EXISTS cardetails;
+DROP TABLE IF EXISTS bookings;
+DROP TABLE IF EXISTS handover;
+DROP TABLE IF EXISTS returned;
+DROP TABLE IF EXISTS works;
+DROP TABLE IF EXISTS hires;
+
 create table customers
 (
     email   text    not null
