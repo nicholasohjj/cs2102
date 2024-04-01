@@ -146,22 +146,26 @@ CREATE OR REPLACE PROCEDURE add_employees (
   eids INT[], enames TEXT[], ephones INT[], zips INT[], pdvls TEXT[]
 ) AS $$
 DECLARE
-i int = 0;
+i int = 1;
 val int = 0;
 BEGIN
-IF array_length(eids, 1) = 0 THEN:
+IF array_length(eids, 1) = 0 THEN
   RETURN;
-ELSE:
-  FOREACH val IN ARRAY eids LOOP
+END IF;
+
+FOREACH val IN ARRAY eids LOOP
     INSERT INTO Employees (eid, ename, ephone, zip) VALUES (eids[i], enames[i], ephones[i], zips[i]);
     IF pdvls[i] IS NOT NULL THEN
-      INSERT INTO Drivers (eid, pdvl) VALUES (eids[i], pdvls[i]);
+        INSERT INTO Drivers (eid, pdvl) VALUES (eids[i], pdvls[i]);
     END IF;
     i:= i+1;
-  END LOOP;
-END IF;
+END LOOP;
+
 END;
 $$ LANGUAGE plpgsql;
+
+
+
 
 
 -- PROCEDURE 2
@@ -176,18 +180,18 @@ CREATE OR REPLACE PROCEDURE add_car (
   plates  TEXT[] , colors TEXT[] , pyears   INT[], zips INT[]
 ) AS $$
 DECLARE
-i int = 0;
-val int = 0;
+i int = 1;
+val text;
 BEGIN
-INSERT INTO CarModel (brand, model, capacity, deposit, daily) VALUES (brand, model, capacity, deposit, daily);
-IF array_length(plates, 1) = 0 THEN:
+INSERT INTO CarModels (brand, model, capacity, deposit, daily) VALUES (brand, model, capacity, deposit, daily);
+IF array_length(plates, 1) = 0 THEN
   RETURN;
 END IF;
+
 FOREACH val IN ARRAY plates LOOP
-    INSERT INTO CarDetails (brand, model, plate, color, pyear, zip) VALUES (brand, model, plates[i], colors[i], pyears[i], zips[i]);
+    INSERT INTO CarDetails (car_brand, car_model, plate, color, pyear, location_zip) VALUES (brand, model, plates[i], colors[i], pyears[i], zips[i]);
     i:= i+1;
   END LOOP;
-END IF;
 END;
 $$ LANGUAGE plpgsql;
 
