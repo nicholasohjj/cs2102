@@ -45,7 +45,8 @@ create table employees
     eid    text not null
         primary key,
     ename  text not null,
-    ephone text not null
+    ephone text not null,
+    zip text NOT NULL REFERENCES locations(zip)
 );
 
 alter table employees
@@ -155,9 +156,9 @@ to be an aggregate between bookings and cardetails + returned, handover
 create table assigns
 (
     bid   integer primary key
-        references p02.bookings(bid),
+        references bookings(bid),
     plate text    not null
-        references p02.cardetails(plate)
+        references cardetails(plate)
 );
 
 /*
@@ -199,16 +200,6 @@ create table returned
 
 alter table returned
     owner to postgres;
-
-create table works(
-    eid text primary key,
-    zip text NOT NULL,
-    FOREIGN KEY(eid) REFERENCES Employees(eid),
-    FOREIGN KEY(zip) REFERENCES Locations(zip),
-    unique(zip)    
-);
-
-
 
 CREATE TABLE Hires(
     bid INT PRIMARY KEY,
