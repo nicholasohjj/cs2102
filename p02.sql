@@ -23,7 +23,7 @@ create table customers
     fsname  text,
     lsname  text    not null,
     name    text generated always as (((fsname || ' '::text) || lsname)) stored,
-    age     int
+    age     integer
 );
 
 alter table customers
@@ -31,7 +31,7 @@ alter table customers
 
 create table locations
 (
-    zip   text,
+    zip   integer,
     lname text not null unique,
     laddr text not null,
     primary key (zip)
@@ -42,10 +42,11 @@ alter table locations
 
 create table employees
 (
-    eid    text not null
+    eid integer not null
         primary key,
     ename  text not null,
-    ephone text not null
+    ephone integer not null,
+    zip integer NOT NULL REFERENCES locations(zip)
 );
 
 alter table employees
@@ -53,7 +54,7 @@ alter table employees
 
 create table drivers
 (
-    eid  text not null primary key references employees (eid),
+    eid  integer not null primary key references employees (eid),
     pdvl text not null,
     UNIQUE (pdvl)
 );
@@ -85,10 +86,10 @@ create table carmodels
     capacity integer not null
         constraint carmodels_capacity_check
             check (capacity > 0),
-    deposit  integer not null
+    deposit  numeric not null
         constraint carmodels_deposit_check
             check (deposit >= 0),
-    daily    integer not null
+    daily numeric not null
         constraint carmodels_daily_check
             check (daily > 0),
     primary key (brand, model)
@@ -116,7 +117,7 @@ create table cardetails
     car_model text not null,
     constraint fk_cardetails_carmodels foreign key(car_brand, car_model) references carmodels(brand, model)
         on update cascade on delete cascade,
-    location_zip text not null,
+    location_zip integer not null,
     constraint fk_cardetails_locations foreign key(location_zip) references locations(zip)
 );
 
@@ -124,9 +125,9 @@ alter table cardetails
     owner to postgres;
 
 CREATE TABLE bookings(
-    bid INT NOT NULL PRIMARY KEY,
+    bid integer NOT NULL PRIMARY KEY,
     sdate DATE NOT NULL /*CONSTRAINT bookings_bdate_sdate_check*/ CHECK (sdate > bdate), -- not sure whether makes a diff but I thought should check sdate > bdate rather than bdate < sdate which is the same but more like the booking is "automatically" recorded and cannot be changed but sdate can 'amend' according to customer
-    days INT NOT NULL /*CONSTRAINT bookings_days_check*/ CHECK (days >= 0),
+    days integer NOT NULL /*CONSTRAINT bookings_days_check*/ CHECK (days >= 0),
     edate DATE GENERATED ALWAYS AS ((sdate + ((days)/*::double precision * '1 day'::interval*/))) STORED, 
     -- I dont think the double precision * '1 days' is required? I tried SELECT (CURRENT_DATE + ((SomeRandomNumber])::double precision * '1 day'::interval)); 
     -- and it's the same as without the typecasting * 1 day except it adds time too? Idk up to yall
@@ -137,20 +138,28 @@ CREATE TABLE bookings(
     -- ensure at most & at least 1 customer / total & key participation
     email TEXT NOT NULL REFERENCES customers (email), 
 
-    -- 0/1 car detail; can be null customer only choose car model and assigning may not be immediate (based on availability)
-    plate TEXT REFERENCES cardetails (plate),
-
     -- 1 car model
     brand TEXT NOT NULL,
     model TEXT NOT NULL,
     /*CONSTRAINT bookings_car*/ FOREIGN KEY (brand, model) REFERENCES carmodels (brand, model),
 
     -- 1 location...?? actually is this required? Since car detail has location
-    zip TEXT NOT NULL REFERENCES locations (zip)
+    zip integer NOT NULL REFERENCES locations (zip)
 );
 
 alter table bookings
     owner to postgres;
+
+/*
+to be an aggregate between bookings and cardetails + returned, handover
+*/
+create table assigns
+(
+    bid   integer primary key
+        references bookings(bid),
+    plate text    not null
+        references cardetails(plate)
+);
 
 /*
 no entry in handover before assigns: enforced with the foreign key constraint in handover.
@@ -163,11 +172,10 @@ there cannot be 2 same eid doing the same handover: true, as bid is the primary 
 */
 create table handover
 (
-    bid   integer,
-    eid   text references employees(eid),
+    bid   integer references bookings(bid),
+    eid   integer references employees(eid),
     primary key(bid),
-    constraint fk_handover_booking foreign key(bid) references bookings(bid)
-        on update cascade on delete cascade
+    constraint fk_handover_assigns foreign key(bid) references assigns(bid)
 );
 
 alter table handover
@@ -181,32 +189,21 @@ create table returned
 (
     ccnum integer, 
     cost float not null,
-    bid   integer,
-    eid   text references employees(eid),
+    bid   integer references bookings(bid),
+    eid   integer references employees(eid),
     primary key(bid),
     constraint fk_returned_handover foreign key(bid) references handover(bid)
         on update cascade on delete cascade,
-    FOREIGN KEY(eid) REFERENCES Employees(eid),
-    FOREIGN KEY(bid) REFERENCES Bookings(bid),
+    constraint fk_returned_assigns foreign key(bid) references assigns(bid),
     CONSTRAINT return_ccnum_cost CHECK ((cost > 0 and ccnum IS NOT NULL) or (cost = 0))
 );
 
 alter table returned
     owner to postgres;
 
-create table works(
-    eid text primary key,
-    zip text NOT NULL,
-    FOREIGN KEY(eid) REFERENCES Employees(eid),
-    FOREIGN KEY(zip) REFERENCES Locations(zip),
-    unique(zip)    
-);
-
-
-
 CREATE TABLE Hires(
-    bid INT PRIMARY KEY,
-    eid TEXT NOT NULL,
+    bid integer PRIMARY KEY,
+    eid integer NOT NULL,
     fromdate DATE NOT NULL,
     todate DATE NOT NULL,
     CHECK (todate >= fromdate),
