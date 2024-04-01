@@ -137,9 +137,6 @@ CREATE TABLE bookings(
     -- ensure at most & at least 1 customer / total & key participation
     email TEXT NOT NULL REFERENCES customers (email), 
 
-    -- 0/1 car detail; can be null customer only choose car model and assigning may not be immediate (based on availability)
-    plate TEXT REFERENCES cardetails (plate),
-
     -- 1 car model
     brand TEXT NOT NULL,
     model TEXT NOT NULL,
@@ -153,6 +150,17 @@ alter table bookings
     owner to postgres;
 
 /*
+to be an aggregate between bookings and cardetails + returned, handover
+*/
+create table assigns
+(
+    bid   integer primary key
+        references p02.bookings(bid),
+    plate text    not null
+        references p02.cardetails(plate)
+);
+
+/*
 no entry in handover before assigns: enforced with the foreign key constraint in handover.
 note that assigns is implemented in bookings itself with the plate column.
 
@@ -163,11 +171,10 @@ there cannot be 2 same eid doing the same handover: true, as bid is the primary 
 */
 create table handover
 (
-    bid   integer,
+    bid   integer references bookings(bid),
     eid   text references employees(eid),
     primary key(bid),
-    constraint fk_handover_booking foreign key(bid) references bookings(bid)
-        on update cascade on delete cascade
+    constraint fk_handover_assigns foreign key(bid) references assigns(bid)
 );
 
 alter table handover
@@ -181,13 +188,12 @@ create table returned
 (
     ccnum integer, 
     cost float not null,
-    bid   integer,
+    bid   integer references bookings(bid),
     eid   text references employees(eid),
     primary key(bid),
     constraint fk_returned_handover foreign key(bid) references handover(bid)
         on update cascade on delete cascade,
-    FOREIGN KEY(eid) REFERENCES Employees(eid),
-    FOREIGN KEY(bid) REFERENCES Bookings(bid),
+    constraint fk_returned_assigns foreign key(bid) references assigns(bid),
     CONSTRAINT return_ccnum_cost CHECK ((cost > 0 and ccnum IS NOT NULL) or (cost = 0))
 );
 
