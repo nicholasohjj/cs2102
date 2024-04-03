@@ -214,15 +214,58 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
+DROP FUNCTION IF EXISTS compute_revenue(DATE, DATE);
 -- FUNCTION 1
 CREATE OR REPLACE FUNCTION compute_revenue (
-  sdate DATE, edate DATE
+  sdate1 DATE, edate1 DATE
 ) RETURNS NUMERIC AS $$
-  -- your code here
+
+  DECLARE
+      curs_B CURSOR FOR (SELECT * FROM BOOKINGS WHERE edate <= edate1 AND sdate >= sdate1 ORDER BY brand, model);
+      curs_C CURSOR FOR (SELECT * FROM carmodels);
+      curs_H CURSOR FOR (SELECT * FROM hires);
+
+      prev_B RECORD;
+      curr_B RECORD;
+      curr_C RECORD;
+      curr_H RECORD;
+      rev NUMERIC := - (SELECT COUNT(*) FROM (SELECT DISTINCT (brand, model) FROM BOOKINGS WHERE edate <= edate1 AND sdate >= sdate1)) * 10;
+      daily NUMERIC;
+
+  BEGIN
+      OPEN curs_B;
+      LOOP
+          FETCH curs_B INTO curr_B;
+          EXIT WHEN NOT FOUND;
+
+          OPEN curs_C;
+          LOOP
+            FETCH curs_C INTO curr_C;
+            EXIT WHEN curr_C.brand = curr_B.brand AND curr_C.model = curr_C.model;
+          end loop;
+
+          CLOSE curs_C;
+          daily := curr_C.daily;
+          rev := rev + (curr_B.edate-curr_B.sdate)*daily;
+          prev_B := curr_B;
+      end loop;
+    CLOSE curs_B;
+
+      OPEN curs_H;
+      LOOP
+          FETCH curs_H INTO curr_H;
+          EXIT WHEN NOT FOUND;
+          IF curr_H.fromdate >= sdate1 AND curr_H.todate <= edate1 THEN rev := rev + ((curr_H.todate - curr_H.fromdate + 1)*10);
+          end if;
+      end loop;
+      CLOSE curs_H;
+
+      return rev;
+  END;
 $$ LANGUAGE plpgsql;
 
 
+SELECT compute_revenue(NOW()::date-1, now()::DATE+50);
 -- FUNCTION 2
 CREATE OR REPLACE FUNCTION top_n_location (
   n INT, sdate DATE, edate DATE
