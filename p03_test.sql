@@ -10,6 +10,7 @@ INSERT INTO Locations (zip,lname,laddr) VALUES (11111,'loc1','loc1addr');
 INSERT INTO Locations (zip,lname,laddr) VALUES (22222,'loc2','loc2addr');
 INSERT INTO Locations (zip,lname,laddr) VALUES (33333,'loc3','loc3addr');
 
+
 CALL add_employees(
   ARRAY[1,2,3], 
   ARRAY['J', 'JJ', 'JJJ'], 
@@ -55,5 +56,19 @@ CALL add_car (
   ARRAY[]::integer[]
 );
 
+INSERT INTO CUSTOMERS (email, address, dob, phone, fsname, lsname, age) VALUES ('test@gmail.com', 'address1', NOW()::DATE-1000, '39872', 'Ricco', 'Lim', 22);
+INSERT INTO CUSTOMERS (email, address, dob, phone, fsname, lsname, age) VALUES ('test2@gmail.com', 'address2', NOW()::DATE-500, '1234', 'Ricco2', 'Lim2', 22);
+INSERT INTO cardetails (plate, color, pyear, car_brand, car_model, location_zip) VALUES ('carplate1', 'red', 2002, 'brand1', 'model1', 22222);
+
+INSERT INTO BOOKINGS (bid, sdate, days, ccnum, bdate, email, brand, model, zip) VALUES (123, NOW()::DATE, 5, '123', NOW()::DATE - 5, 'test@gmail.com', 'brand1', 'model1', 22222);
+INSERT INTO BOOKINGS (bid, sdate, days, ccnum, bdate, email, brand, model, zip) VALUES (124, NOW()::DATE+5, 5, '123', NOW()::DATE - 10, 'test2@gmail.com', 'brand2', 'model2', 22222);
+INSERT INTO BOOKINGS (bid, sdate, days, ccnum, bdate, email, brand, model, zip) VALUES (125, NOW()::DATE+7, 20, '123', NOW()::DATE - 10, 'test2@gmail.com', 'brand2', 'model2', 22222);
+
+SELECT compute_revenue(NOW()::date-1, now()::DATE+50);
+CALL return_car(123, 1);
+
+select * from returned;
+
 SELECT * FROM carmodels;
 SELECT * FROM cardetails;
+select * from bookings;

@@ -195,13 +195,52 @@ FOREACH val IN ARRAY plates LOOP
 END;
 $$ LANGUAGE plpgsql;
 
+DROP PROCEDURE IF EXISTS return_car;
 -- PROCEDURE 3
 CREATE OR REPLACE PROCEDURE return_car (
-  bid INT, eid INT
+  bid1 INT, eid1 INT
 ) AS $$
--- add declarations here
+    DECLARE
+        cur_B CURSOR FOR (SELECT * FROM bookings WHERE bid = bid1);
+        cur_M CURSOR FOR (SELECT * FROM carmodels);
+        cur_D CURSOR FOR (SELECT * FROM cardetails);
+
+        rec_B RECORD;
+        rec_M RECORD;
+        rec_D RECORD;
+
+        cost DOUBLE PRECISION;
+        ccnum INT;
 BEGIN
-  -- your code here
+        OPEN cur_B;
+        FETCH cur_B INTO rec_B;
+        CLOSE cur_B;
+
+        OPEN cur_M;
+        LOOP
+            FETCH cur_M INTO rec_M;
+            EXIT WHEN rec_M.brand = rec_B.brand AND rec_M.model = rec_B.model OR NOT FOUND;
+        end loop;
+        CLOSE cur_M;
+
+        cost := (rec_B.days * rec_M.daily) - rec_M.deposit;
+        ccnum := rec_B.ccnum;
+
+        -- I forgot what assigns and handover are for so I'm not sure whether the inserting into assigns & handover are required...
+        -- If not required, can delete from here:
+
+        OPEN cur_D;
+        LOOP
+            FETCH cur_D INTO rec_D;
+            EXIT WHEN rec_D.car_brand = rec_M.brand AND rec_D.car_model = rec_M.model OR NOT FOUND;
+        end loop;
+        CLOSE cur_D;
+
+        INSERT INTO assigns (bid, plate) VALUES (bid1, rec_D.plate);
+        INSERT INTO handover (bid, eid) VALUES (bid1, eid1);
+        -- Can delete to here
+
+        INSERT INTO returned (ccnum, cost, bid, eid) VALUES (ccnum, cost, bid1, eid1);
 END;
 $$ LANGUAGE plpgsql;
 
@@ -214,14 +253,55 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
+DROP FUNCTION IF EXISTS compute_revenue(DATE, DATE);
 -- FUNCTION 1
 CREATE OR REPLACE FUNCTION compute_revenue (
-  sdate DATE, edate DATE
+  sdate1 DATE, edate1 DATE
 ) RETURNS NUMERIC AS $$
-  -- your code here
-$$ LANGUAGE plpgsql;
 
+  DECLARE
+      curs_B CURSOR FOR (SELECT * FROM BOOKINGS WHERE edate <= edate1 AND sdate >= sdate1 ORDER BY brand, model);
+      curs_C CURSOR FOR (SELECT * FROM carmodels);
+      curs_H CURSOR FOR (SELECT * FROM hires);
+
+      prev_B RECORD;
+      curr_B RECORD;
+      curr_C RECORD;
+      curr_H RECORD;
+      rev NUMERIC := - (SELECT COUNT(*) FROM (SELECT DISTINCT (brand, model) FROM BOOKINGS WHERE edate <= edate1 AND sdate >= sdate1)) * 10;
+      daily NUMERIC;
+
+  BEGIN
+      OPEN curs_B;
+      LOOP
+          FETCH curs_B INTO curr_B;
+          EXIT WHEN NOT FOUND;
+
+          OPEN curs_C;
+          LOOP
+            FETCH curs_C INTO curr_C;
+            EXIT WHEN curr_C.brand = curr_B.brand AND curr_C.model = curr_C.model OR NOT FOUND;
+          end loop;
+
+          CLOSE curs_C;
+          daily := curr_C.daily;
+          rev := rev + (curr_B.edate-curr_B.sdate)*daily;
+          prev_B := curr_B;
+      end loop;
+    CLOSE curs_B;
+
+      OPEN curs_H;
+      LOOP
+          FETCH curs_H INTO curr_H;
+          EXIT WHEN NOT FOUND;
+          IF curr_H.fromdate >= sdate1 AND curr_H.todate <= edate1 THEN rev := rev + ((curr_H.todate - curr_H.fromdate + 1)*10);
+          end if;
+      end loop;
+      CLOSE curs_H;
+
+      return rev;
+  END;
+$$ LANGUAGE plpgsql;
 
 -- FUNCTION 2
 CREATE OR REPLACE FUNCTION top_n_location (
