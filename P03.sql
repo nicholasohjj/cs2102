@@ -195,13 +195,52 @@ FOREACH val IN ARRAY plates LOOP
 END;
 $$ LANGUAGE plpgsql;
 
+DROP PROCEDURE IF EXISTS return_car;
 -- PROCEDURE 3
 CREATE OR REPLACE PROCEDURE return_car (
-  bid INT, eid INT
+  bid1 INT, eid1 INT
 ) AS $$
--- add declarations here
+    DECLARE
+        cur_B CURSOR FOR (SELECT * FROM bookings WHERE bid = bid1);
+        cur_M CURSOR FOR (SELECT * FROM carmodels);
+        cur_D CURSOR FOR (SELECT * FROM cardetails);
+
+        rec_B RECORD;
+        rec_M RECORD;
+        rec_D RECORD;
+
+        cost DOUBLE PRECISION;
+        ccnum INT;
 BEGIN
-  -- your code here
+        OPEN cur_B;
+        FETCH cur_B INTO rec_B;
+        CLOSE cur_B;
+
+        OPEN cur_M;
+        LOOP
+            FETCH cur_M INTO rec_M;
+            EXIT WHEN rec_M.brand = rec_B.brand AND rec_M.model = rec_B.model OR NOT FOUND;
+        end loop;
+        CLOSE cur_M;
+
+        cost := (rec_B.days * rec_M.daily) - rec_M.deposit;
+        ccnum := rec_B.ccnum;
+
+        -- I forgot what assigns and handover are for so I'm not sure whether the inserting into assigns & handover are required...
+        -- If not required, can delete from here:
+
+        OPEN cur_D;
+        LOOP
+            FETCH cur_D INTO rec_D;
+            EXIT WHEN rec_D.car_brand = rec_M.brand AND rec_D.car_model = rec_M.model OR NOT FOUND;
+        end loop;
+        CLOSE cur_D;
+
+        INSERT INTO assigns (bid, plate) VALUES (bid1, rec_D.plate);
+        INSERT INTO handover (bid, eid) VALUES (bid1, eid1);
+        -- Can delete to here
+
+        INSERT INTO returned (ccnum, cost, bid, eid) VALUES (ccnum, cost, bid1, eid1);
 END;
 $$ LANGUAGE plpgsql;
 
@@ -241,7 +280,7 @@ CREATE OR REPLACE FUNCTION compute_revenue (
           OPEN curs_C;
           LOOP
             FETCH curs_C INTO curr_C;
-            EXIT WHEN curr_C.brand = curr_B.brand AND curr_C.model = curr_C.model;
+            EXIT WHEN curr_C.brand = curr_B.brand AND curr_C.model = curr_C.model OR NOT FOUND;
           end loop;
 
           CLOSE curs_C;
@@ -264,8 +303,6 @@ CREATE OR REPLACE FUNCTION compute_revenue (
   END;
 $$ LANGUAGE plpgsql;
 
-
-SELECT compute_revenue(NOW()::date-1, now()::DATE+50);
 -- FUNCTION 2
 CREATE OR REPLACE FUNCTION top_n_location (
   n INT, sdate DATE, edate DATE
