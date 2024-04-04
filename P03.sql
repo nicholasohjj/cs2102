@@ -197,8 +197,52 @@ $$ LANGUAGE plpgsql;
 
 DROP PROCEDURE IF EXISTS return_car;
 -- PROCEDURE 3
+
 CREATE OR REPLACE PROCEDURE return_car (
-  bid1 INT, eid1 INT
+  bid1 INT,
+  eid1 INT
+) AS $$
+DECLARE
+    -- Variables for holding computed values
+    v_cost NUMERIC; -- Computed rental cost
+    v_ccnum TEXT; -- Credit card number from the booking
+
+    -- Variables for fetching booking and car model details directly
+    v_daily_rate NUMERIC; -- Daily rate for the car model
+    v_days RENTED INT; -- Number of days the car was rented
+    v_deposit NUMERIC; -- Deposit amount for the car model
+BEGIN
+    -- Fetch the necessary details with a JOIN between Bookings and CarModels
+    SELECT
+        b.days AS rented_days,
+        cm.daily AS daily_rate,
+        cm.deposit AS model_deposit,
+        b.ccnum
+    INTO
+        v_days, v_daily_rate, v_deposit, v_ccnum
+    FROM
+        Bookings b
+    JOIN CarModels cm ON
+        b.brand = cm.brand AND b.model = cm.model
+    WHERE
+        b.bid = bid1;
+
+    -- Compute the cost
+    v_cost := (v_daily_rate * v_days) - v_deposit;
+
+    -- Since we have all the required details, proceed to insert into `Returned`
+    INSERT INTO Returned (bid, eid, ccnum, cost)
+    VALUES (bid1, eid1, v_ccnum, v_cost);
+
+    -- Optionally, update the Assigns and Handover tables if necessary based on your application logic
+    -- For simplicity, this step is omitted here. Add it if your logic requires tracking these entities.
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE PROCEDURE return_car (
+  bid1 INT,
+  eid1 INT
 ) AS $$
     DECLARE
         cur_B CURSOR FOR (SELECT * FROM bookings WHERE bid = bid1);
