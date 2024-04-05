@@ -189,7 +189,7 @@ IF array_length(plates, 1) = 0 THEN
 END IF;
 
 FOREACH val IN ARRAY plates LOOP
-    INSERT INTO CarDetails (car_brand, car_model, plate, color, pyear, location_zip) VALUES (brand, model, plates[i], colors[i], pyears[i], zips[i]);
+    INSERT INTO CarDetails (brand, model, plate, color, pyear, zip) VALUES (brand, model, plates[i], colors[i], pyears[i], zips[i]);
     i:= i+1;
   END LOOP;
 END;
