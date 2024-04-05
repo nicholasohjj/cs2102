@@ -1,8 +1,9 @@
 /*
-Group #
-1. Name 1
-  - Contribution A
-  - Contribution B
+Group 147
+1. Isabel Teo Jing Lin
+  - add_employees
+  - add_cars
+  - corresponding tests and cross-checking tests of triggers
 2. Name 2
   - Contribution A
   - Contribution B
@@ -132,23 +133,15 @@ FOR EACH ROW EXECUTE FUNCTION check_driver_hire_dates();
 */
 
 -- PROCEDURE 1
-/*
-If any of the arrays have size of 0, then do nothing
-
-else, Loop through the array values to add employee information to the employee's table 
-(e.g., eids[3], enames[3], ephones[3], zips[3], and pdvls[3] are information for the same employee)
-
-if pdvl is NOT NULL, then add the employee into the drivers table as well
-
-*/
 
 CREATE OR REPLACE PROCEDURE add_employees (
   eids INT[], enames TEXT[], ephones INT[], zips INT[], pdvls TEXT[]
 ) AS $$
 DECLARE
-i int = 1;
+i int = 1; /* plpg arrs start from 1 */
 val int = 0;
 BEGIN
+/* all arr can be assumed to have same length so just check one */
 IF array_length(eids, 1) = 0 THEN
   RETURN;
 END IF;
@@ -164,32 +157,25 @@ END LOOP;
 END;
 $$ LANGUAGE plpgsql;
 
-
-
-
-
 -- PROCEDURE 2
-/*
-Write a procedure to add car model with the attributes:  brand, model, capacity, deposit, daily
-Then, add the car details into cardetails with the attributes: brand, model, plate, color, pyear, zip
-note that the arrays could be empty as a carmodel may not have car details
-*/
+
 CREATE OR REPLACE PROCEDURE add_car (
   brand   TEXT   , model  TEXT   , capacity INT  ,
   deposit NUMERIC, daily  NUMERIC,
   plates  TEXT[] , colors TEXT[] , pyears   INT[], zips INT[]
 ) AS $$
 DECLARE
-i int = 1;
+i int = 1; /* plpg arrs start from 1 */
 val text;
 BEGIN
 INSERT INTO CarModels (brand, model, capacity, deposit, daily) VALUES (brand, model, capacity, deposit, daily);
+/* all arr can be assumed to have same length so just check one */
 IF array_length(plates, 1) = 0 THEN
   RETURN;
 END IF;
 
 FOREACH val IN ARRAY plates LOOP
-    INSERT INTO CarDetails (car_brand, car_model, plate, color, pyear, location_zip) VALUES (brand, model, plates[i], colors[i], pyears[i], zips[i]);
+    INSERT INTO CarDetails (brand, model, plate, color, pyear, zip) VALUES (brand, model, plates[i], colors[i], pyears[i], zips[i]);
     i:= i+1;
   END LOOP;
 END;
