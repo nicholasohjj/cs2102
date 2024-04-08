@@ -90,10 +90,18 @@ INSERT INTO BOOKINGS (bid, sdate, days, ccnum, bdate, email, brand, model, zip) 
 INSERT INTO BOOKINGS (bid, sdate, days, ccnum, bdate, email, brand, model, zip) VALUES (125, NOW()::DATE+7, 20, '123', NOW()::DATE - 10, 'test2@gmail.com', 'brand2', 'model2', 22222);
 
 SELECT compute_revenue(NOW()::date-1, now()::DATE+50);
-CALL return_car(123, 1);
+CALL return_car(3, 321);
 
+INSERT INTO Assigns (bid, plate)
+VALUES (3, 'Plate1');
+
+INSERT INTO Handover (bid, eid) VALUES
+(3, 1);
+
+select * from employees;
+select * from assigns;
 select * from returned;
-
+select * from handover;
 SELECT * FROM carmodels;
 SELECT * FROM cardetails;
 select * from bookings;

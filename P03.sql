@@ -4,9 +4,10 @@ Group 147
   - add_employees
   - add_cars
   - corresponding tests and cross-checking tests of triggers
-2. Name 2
-  - Contribution A
-  - Contribution B
+2. Ricco Lim
+  - return_car
+  - compute_revenue
+  - Added in some tests for return_car and cross-checked auto_assigns & top_n_location
 */
 
 
@@ -195,7 +196,7 @@ DECLARE
 
     -- Variables for fetching booking and car model details directly
     v_daily_rate NUMERIC; -- Daily rate for the car model
-    v_days RENTED INT; -- Number of days the car was rented
+    v_days INT; -- Number of days the car was rented
     v_deposit NUMERIC; -- Deposit amount for the car model
 BEGIN
     -- Fetch the necessary details with a JOIN between Bookings and CarModels
@@ -231,49 +232,16 @@ CREATE OR REPLACE PROCEDURE return_car (
   eid1 INT
 ) AS $$
     DECLARE
-        cur_B CURSOR FOR (SELECT * FROM bookings WHERE bid = bid1);
-        cur_M CURSOR FOR (SELECT * FROM carmodels);
-        cur_D CURSOR FOR (SELECT * FROM cardetails);
-
-        rec_B RECORD;
-        rec_M RECORD;
-        rec_D RECORD;
-
-        cost DOUBLE PRECISION;
-        ccnum INT;
+        ccnum text;
+        cost numeric;
 BEGIN
-        OPEN cur_B;
-        FETCH cur_B INTO rec_B;
-        CLOSE cur_B;
-
-        OPEN cur_M;
-        LOOP
-            FETCH cur_M INTO rec_M;
-            EXIT WHEN rec_M.brand = rec_B.brand AND rec_M.model = rec_B.model OR NOT FOUND;
-        end loop;
-        CLOSE cur_M;
-
-        cost := (rec_B.days * rec_M.daily) - rec_M.deposit;
-        ccnum := rec_B.ccnum;
-
-        -- I forgot what assigns and handover are for so I'm not sure whether the inserting into assigns & handover are required...
-        -- If not required, can delete from here:
-
-        OPEN cur_D;
-        LOOP
-            FETCH cur_D INTO rec_D;
-            EXIT WHEN rec_D.car_brand = rec_M.brand AND rec_D.car_model = rec_M.model OR NOT FOUND;
-        end loop;
-        CLOSE cur_D;
-
-        INSERT INTO assigns (bid, plate) VALUES (bid1, rec_D.plate);
-        INSERT INTO handover (bid, eid) VALUES (bid1, eid1);
-        -- Can delete to here
-
+        SELECT bookings.ccnum, (daily * days - deposit) INTO ccnum, cost FROM bookings NATURAL JOIN carmodels WHERE bid = bid1;
         INSERT INTO returned (ccnum, cost, bid, eid) VALUES (ccnum, cost, bid1, eid1);
 END;
 $$ LANGUAGE plpgsql;
 
+select * from bookings;
+select * from bookings b natural join carmodels cm;
 
 -- PROCEDURE 4
 CREATE OR REPLACE PROCEDURE auto_assign () AS $$
@@ -290,7 +258,7 @@ CREATE OR REPLACE FUNCTION compute_revenue (
 ) RETURNS NUMERIC AS $$
 
   DECLARE
-      curs_B CURSOR FOR (SELECT * FROM BOOKINGS WHERE edate <= edate1 AND sdate >= sdate1 ORDER BY brand, model);
+      curs_B CURSOR FOR (SELECT * FROM BOOKINGS WHERE sdate+days <= edate1 AND sdate >= sdate1 ORDER BY brand, model);
       curs_C CURSOR FOR (SELECT * FROM carmodels);
       curs_H CURSOR FOR (SELECT * FROM hires);
 
@@ -298,7 +266,7 @@ CREATE OR REPLACE FUNCTION compute_revenue (
       curr_B RECORD;
       curr_C RECORD;
       curr_H RECORD;
-      rev NUMERIC := - (SELECT COUNT(*) FROM (SELECT DISTINCT (brand, model) FROM BOOKINGS WHERE edate <= edate1 AND sdate >= sdate1)) * 10;
+      rev NUMERIC := - (SELECT COUNT(*) FROM (SELECT DISTINCT (brand, model) FROM BOOKINGS WHERE sdate+days <= edate1 AND sdate >= sdate1)) * 100;
       daily NUMERIC;
 
   BEGIN

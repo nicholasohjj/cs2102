@@ -72,3 +72,4 @@ INSERT INTO Returned (bid, eid, ccnum, cost) VALUES
 INSERT INTO Hires (bid, eid, fromdate, todate, ccnum) VALUES
 (1, 1, '2024-01-01', '2024-01-06', 'CCNum1'),
 (2, 2, '2024-02-01', '2024-02-06', 'CCNum2');
+
