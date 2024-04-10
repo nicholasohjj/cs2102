@@ -326,7 +326,7 @@ CREATE OR REPLACE FUNCTION compute_revenue (
 
           CLOSE curs_C;
           daily := curr_C.daily;
-          rev := rev + (curr_B.edate-curr_B.sdate)*daily;
+          rev := rev + curr_B.days * daily;
           prev_B := curr_B;
       end loop;
     CLOSE curs_B;
