@@ -243,11 +243,47 @@ $$ LANGUAGE plpgsql;
 select * from bookings;
 select * from bookings b natural join carmodels cm;
 
+DROP PROCEDURE IF EXISTS auto_assign;
 -- PROCEDURE 4
 CREATE OR REPLACE PROCEDURE auto_assign () AS $$
--- add declarations here
-BEGIN
-  -- your code here
+DECLARE 
+  booking_row RECORD;
+  car_to_assign RECORD;
+BEGIN 
+  FOR booking_row IN (
+    SELECT
+      b.*
+    FROM
+      Bookings b
+      LEFT JOIN Assigns a ON a.bid = b.bid
+    WHERE
+      a.bid IS NULL
+    ORDER BY
+      b.bid ASC
+  ) LOOP
+    SELECT
+      *
+    INTO
+      car_to_assign
+    FROM
+      CarDetails c
+      LEFT JOIN Assigns a ON c.plate = a.plate
+    WHERE
+      a.plate IS NULL
+      AND c.brand = booking_row.brand
+      AND c.model = booking_row.model
+      AND c.zip = booking_row.zip
+    ORDER BY
+      c.plate
+    LIMIT 1;
+    RAISE NOTICE 'BOOKING ROW: %', ROW_TO_JSON(booking_row);
+    RAISE NOTICE 'CAR: %', ROW_TO_JSON(car_to_assign);
+    IF car_to_assign.plate IS NOT NULL THEN
+      RAISE NOTICE 'TRUE';
+      INSERT INTO Assigns (bid, plate)
+      VALUES (booking_row.bid, car_to_assign.plate);
+    END IF;
+  END LOOP;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -301,9 +337,104 @@ CREATE OR REPLACE FUNCTION compute_revenue (
   END;
 $$ LANGUAGE plpgsql;
 
--- FUNCTION 2
-CREATE OR REPLACE FUNCTION top_n_location (
-  n INT, sdate DATE, edate DATE
-) RETURNS TABLE(lname TEXT, revenue NUMERIC, rank INT) AS $$
-  -- your code here
+-- FUNCTION 2 HELPER FUNCTION
+DROP FUNCTION IF EXISTS compute_revenue_i(DATE, DATE, TEXT);
+CREATE OR REPLACE FUNCTION compute_revenue_i (
+  sdate1 DATE, edate1 DATE, namel TEXT
+) RETURNS NUMERIC AS $$
+
+  DECLARE
+      curs_B CURSOR FOR (SELECT * FROM BOOKINGS LEFT JOIN LOCATIONS ON BOOKINGS.ZIP = LOCATIONS.ZIP WHERE sdate + days <= edate1 AND sdate >= sdate1 AND LOCATIONS.lname = namel ORDER BY brand, model);
+      curs_C CURSOR FOR (SELECT * FROM carmodels);
+      curs_H CURSOR FOR (SELECT * FROM hires h LEFT JOIN Employees e on h.eid = e.eid left join LOCATIONS l on e.zip = l.zip WHERE l.lname = namel);
+
+      prev_B RECORD;
+      curr_B RECORD;
+      curr_C RECORD;
+      curr_H RECORD;
+      rev NUMERIC := - (SELECT COUNT(*) FROM (SELECT DISTINCT (brand, model) FROM BOOKINGS LEFT JOIN ASSIGNS ON ASSIGNS.bid = BOOKINGS.bid LEFT JOIN LOCATIONS ON BOOKINGS.ZIP = LOCATIONS.ZIP WHERE sdate + days <= edate1 AND sdate >= sdate1 AND LOCATIONS.lname = namel AND ASSIGNS.bid is not null)) * 100;
+      daily NUMERIC;
+
+  BEGIN
+      OPEN curs_B;
+      LOOP
+          FETCH curs_B INTO curr_B;
+          EXIT WHEN NOT FOUND;
+
+          OPEN curs_C;
+          LOOP
+            FETCH curs_C INTO curr_C;
+            EXIT WHEN curr_C.brand = curr_B.brand AND curr_C.model = curr_C.model OR NOT FOUND;
+          end loop;
+
+          CLOSE curs_C;
+          daily := curr_C.daily;
+          rev := rev + (curr_B.sdate + curr_B.days -curr_B.sdate)*daily;
+          prev_B := curr_B;
+      end loop;
+    CLOSE curs_B;
+
+      OPEN curs_H;
+      LOOP
+          FETCH curs_H INTO curr_H;
+          EXIT WHEN NOT FOUND;
+          IF curr_H.fromdate >= sdate1 AND curr_H.todate <= edate1 THEN rev := rev + ((curr_H.todate - curr_H.fromdate + 1)*10);
+          end if;
+      end loop;
+      CLOSE curs_H;
+
+      return rev;
+  END;
 $$ LANGUAGE plpgsql;
+
+DROP FUNCTION IF EXISTS inner(DATE, DATE);
+CREATE OR REPLACE FUNCTION inner(start_date DATE, end_date DATE) RETURNS TABLE (lname TEXT, revenue NUMERIC) AS $$
+DECLARE
+    location_record RECORD;
+    location_revenues NUMERIC;
+BEGIN
+    FOR location_record IN SELECT * FROM Locations LOOP
+	    lname = location_record.lname;
+        revenue := compute_revenue_i(start_date, end_date, location_record.lname);
+        RETURN NEXT;
+    END LOOP;
+
+    RETURN;
+END;
+$$ LANGUAGE plpgsql;
+
+-- FUNCTION 2
+DROP FUNCTION IF EXISTS calculate_location_revenues(INT, DATE, DATE);
+CREATE OR REPLACE FUNCTION calculate_location_revenues(n INT, start_date DATE, end_date DATE) RETURNS TABLE (Location TEXT, Revenue NUMERIC, Rank INT) AS $$
+BEGIN 
+
+    RETURN QUERY
+    WITH temp AS (
+        SELECT
+            lname,
+            count(lname) AS count
+        FROM
+            inner(start_date, end_date)
+        GROUP BY
+            lname
+    ),
+    result AS (
+        SELECT
+            *
+        FROM
+            inner(start_date, end_date)
+    )
+    SELECT
+        temp.lname AS lname,
+        result.revenue as revenue,
+        (RANK() OVER (ORDER BY result.revenue DESC) + temp.count - 1)::int AS rank
+    FROM
+        result
+    LEFT JOIN temp ON temp.lname = result.lname;
+
+END;
+$$ LANGUAGE plpgsql;
+
+
+
+
