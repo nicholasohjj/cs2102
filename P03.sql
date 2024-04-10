@@ -8,6 +8,13 @@ Group 147
   - return_car
   - compute_revenue
   - Added in some tests for return_car and cross-checked auto_assigns & top_n_location
+3. Nicholas Oh
+  -check_driver_double_booking
+  - check_car_double_booking
+  - check_handover_location
+  - check_car_model_match
+  - check_car_parking_location
+  - check_driver_hire_dates
 */
 
 
