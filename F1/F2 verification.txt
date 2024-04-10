@@ -1,0 +1,35 @@
+
+Using the data_population.sql
+
+Result should be 
+760 for F1: compute_revenue(1990-01-01,2024-04-01)
+210 for F2: location 1
+
+Booking 1, model 1
+5 * 50
+Booking 2, model 2
+7 * 50
+Booking 3, model 3
+4 * 60
+
+
+Hires 1
+(6 - 1 + 1) * 10
+
+
+Hires 2 
+(6 - 1 + 1) * 10
+
+
+Car Model 1
+
+Car Model 2
+
+200
+
+
+
+5 * 50 + 7 * 50 + 4 * 60 + 60 + 60  + 200
+
+Location 1:
+250 + 60 - 100

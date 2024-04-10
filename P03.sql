@@ -1,11 +1,20 @@
 /*
-Group #
-1. Name 1
-  - Contribution A
-  - Contribution B
-2. Name 2
-  - Contribution A
-  - Contribution B
+Group 147
+1. Isabel Teo Jing Lin
+  - add_employees
+  - add_cars
+  - corresponding tests and cross-checking tests of triggers
+2. Ricco Lim
+  - return_car
+  - compute_revenue
+  - Added in some tests for return_car and cross-checked auto_assigns & top_n_location
+3. Nicholas Oh
+  -check_driver_double_booking
+  - check_car_double_booking
+  - check_handover_location
+  - check_car_model_match
+  - check_car_parking_location
+  - check_driver_hire_dates
 */
 
 
@@ -132,23 +141,15 @@ FOR EACH ROW EXECUTE FUNCTION check_driver_hire_dates();
 */
 
 -- PROCEDURE 1
-/*
-If any of the arrays have size of 0, then do nothing
-
-else, Loop through the array values to add employee information to the employee's table 
-(e.g., eids[3], enames[3], ephones[3], zips[3], and pdvls[3] are information for the same employee)
-
-if pdvl is NOT NULL, then add the employee into the drivers table as well
-
-*/
 
 CREATE OR REPLACE PROCEDURE add_employees (
   eids INT[], enames TEXT[], ephones INT[], zips INT[], pdvls TEXT[]
 ) AS $$
 DECLARE
-i int = 1;
+i int = 1; /* plpg arrs start from 1 */
 val int = 0;
 BEGIN
+/* all arr can be assumed to have same length so just check one */
 IF array_length(eids, 1) = 0 THEN
   RETURN;
 END IF;
@@ -164,32 +165,25 @@ END LOOP;
 END;
 $$ LANGUAGE plpgsql;
 
-
-
-
-
 -- PROCEDURE 2
-/*
-Write a procedure to add car model with the attributes:  brand, model, capacity, deposit, daily
-Then, add the car details into cardetails with the attributes: brand, model, plate, color, pyear, zip
-note that the arrays could be empty as a carmodel may not have car details
-*/
+
 CREATE OR REPLACE PROCEDURE add_car (
   brand   TEXT   , model  TEXT   , capacity INT  ,
   deposit NUMERIC, daily  NUMERIC,
   plates  TEXT[] , colors TEXT[] , pyears   INT[], zips INT[]
 ) AS $$
 DECLARE
-i int = 1;
+i int = 1; /* plpg arrs start from 1 */
 val text;
 BEGIN
 INSERT INTO CarModels (brand, model, capacity, deposit, daily) VALUES (brand, model, capacity, deposit, daily);
+/* all arr can be assumed to have same length so just check one */
 IF array_length(plates, 1) = 0 THEN
   RETURN;
 END IF;
 
 FOREACH val IN ARRAY plates LOOP
-    INSERT INTO CarDetails (car_brand, car_model, plate, color, pyear, location_zip) VALUES (brand, model, plates[i], colors[i], pyears[i], zips[i]);
+    INSERT INTO CarDetails (brand, model, plate, color, pyear, zip) VALUES (brand, model, plates[i], colors[i], pyears[i], zips[i]);
     i:= i+1;
   END LOOP;
 END;
@@ -197,59 +191,106 @@ $$ LANGUAGE plpgsql;
 
 DROP PROCEDURE IF EXISTS return_car;
 -- PROCEDURE 3
+
 CREATE OR REPLACE PROCEDURE return_car (
-  bid1 INT, eid1 INT
+  bid1 INT,
+  eid1 INT
 ) AS $$
-    DECLARE
-        cur_B CURSOR FOR (SELECT * FROM bookings WHERE bid = bid1);
-        cur_M CURSOR FOR (SELECT * FROM carmodels);
-        cur_D CURSOR FOR (SELECT * FROM cardetails);
+DECLARE
+    -- Variables for holding computed values
+    v_cost NUMERIC; -- Computed rental cost
+    v_ccnum TEXT; -- Credit card number from the booking
 
-        rec_B RECORD;
-        rec_M RECORD;
-        rec_D RECORD;
-
-        cost DOUBLE PRECISION;
-        ccnum INT;
+    -- Variables for fetching booking and car model details directly
+    v_daily_rate NUMERIC; -- Daily rate for the car model
+    v_days INT; -- Number of days the car was rented
+    v_deposit NUMERIC; -- Deposit amount for the car model
 BEGIN
-        OPEN cur_B;
-        FETCH cur_B INTO rec_B;
-        CLOSE cur_B;
+    -- Fetch the necessary details with a JOIN between Bookings and CarModels
+    SELECT
+        b.days AS rented_days,
+        cm.daily AS daily_rate,
+        cm.deposit AS model_deposit,
+        b.ccnum
+    INTO
+        v_days, v_daily_rate, v_deposit, v_ccnum
+    FROM
+        Bookings b
+    JOIN CarModels cm ON
+        b.brand = cm.brand AND b.model = cm.model
+    WHERE
+        b.bid = bid1;
 
-        OPEN cur_M;
-        LOOP
-            FETCH cur_M INTO rec_M;
-            EXIT WHEN rec_M.brand = rec_B.brand AND rec_M.model = rec_B.model OR NOT FOUND;
-        end loop;
-        CLOSE cur_M;
+    -- Compute the cost
+    v_cost := (v_daily_rate * v_days) - v_deposit;
 
-        cost := (rec_B.days * rec_M.daily) - rec_M.deposit;
-        ccnum := rec_B.ccnum;
+    -- Since we have all the required details, proceed to insert into `Returned`
+    INSERT INTO Returned (bid, eid, ccnum, cost)
+    VALUES (bid1, eid1, v_ccnum, v_cost);
 
-        -- I forgot what assigns and handover are for so I'm not sure whether the inserting into assigns & handover are required...
-        -- If not required, can delete from here:
-
-        OPEN cur_D;
-        LOOP
-            FETCH cur_D INTO rec_D;
-            EXIT WHEN rec_D.car_brand = rec_M.brand AND rec_D.car_model = rec_M.model OR NOT FOUND;
-        end loop;
-        CLOSE cur_D;
-
-        INSERT INTO assigns (bid, plate) VALUES (bid1, rec_D.plate);
-        INSERT INTO handover (bid, eid) VALUES (bid1, eid1);
-        -- Can delete to here
-
-        INSERT INTO returned (ccnum, cost, bid, eid) VALUES (ccnum, cost, bid1, eid1);
+    -- Optionally, update the Assigns and Handover tables if necessary based on your application logic
+    -- For simplicity, this step is omitted here. Add it if your logic requires tracking these entities.
 END;
 $$ LANGUAGE plpgsql;
 
 
+CREATE OR REPLACE PROCEDURE return_car (
+  bid1 INT,
+  eid1 INT
+) AS $$
+    DECLARE
+        ccnum text;
+        cost numeric;
+BEGIN
+        SELECT bookings.ccnum, (daily * days - deposit) INTO ccnum, cost FROM bookings NATURAL JOIN carmodels WHERE bid = bid1;
+        INSERT INTO returned (ccnum, cost, bid, eid) VALUES (ccnum, cost, bid1, eid1);
+END;
+$$ LANGUAGE plpgsql;
+
+select * from bookings;
+select * from bookings b natural join carmodels cm;
+
+DROP PROCEDURE IF EXISTS auto_assign;
 -- PROCEDURE 4
 CREATE OR REPLACE PROCEDURE auto_assign () AS $$
--- add declarations here
-BEGIN
-  -- your code here
+DECLARE 
+  booking_row RECORD;
+  car_to_assign RECORD;
+BEGIN 
+  FOR booking_row IN (
+    SELECT
+      b.*
+    FROM
+      Bookings b
+      LEFT JOIN Assigns a ON a.bid = b.bid
+    WHERE
+      a.bid IS NULL
+    ORDER BY
+      b.bid ASC
+  ) LOOP
+    SELECT
+      *
+    INTO
+      car_to_assign
+    FROM
+      CarDetails c
+      LEFT JOIN Assigns a ON c.plate = a.plate
+    WHERE
+      a.plate IS NULL
+      AND c.brand = booking_row.brand
+      AND c.model = booking_row.model
+      AND c.zip = booking_row.zip
+    ORDER BY
+      c.plate
+    LIMIT 1;
+    RAISE NOTICE 'BOOKING ROW: %', ROW_TO_JSON(booking_row);
+    RAISE NOTICE 'CAR: %', ROW_TO_JSON(car_to_assign);
+    IF car_to_assign.plate IS NOT NULL THEN
+      RAISE NOTICE 'TRUE';
+      INSERT INTO Assigns (bid, plate)
+      VALUES (booking_row.bid, car_to_assign.plate);
+    END IF;
+  END LOOP;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -260,7 +301,7 @@ CREATE OR REPLACE FUNCTION compute_revenue (
 ) RETURNS NUMERIC AS $$
 
   DECLARE
-      curs_B CURSOR FOR (SELECT * FROM BOOKINGS WHERE edate <= edate1 AND sdate >= sdate1 ORDER BY brand, model);
+      curs_B CURSOR FOR (SELECT * FROM BOOKINGS WHERE sdate+days <= edate1 AND sdate >= sdate1 ORDER BY brand, model);
       curs_C CURSOR FOR (SELECT * FROM carmodels);
       curs_H CURSOR FOR (SELECT * FROM hires);
 
@@ -268,7 +309,7 @@ CREATE OR REPLACE FUNCTION compute_revenue (
       curr_B RECORD;
       curr_C RECORD;
       curr_H RECORD;
-      rev NUMERIC := - (SELECT COUNT(*) FROM (SELECT DISTINCT (brand, model) FROM BOOKINGS WHERE edate <= edate1 AND sdate >= sdate1)) * 10;
+      rev NUMERIC := - (SELECT COUNT(*) FROM (SELECT DISTINCT (brand, model) FROM BOOKINGS WHERE sdate+days <= edate1 AND sdate >= sdate1)) * 100;
       daily NUMERIC;
 
   BEGIN
@@ -285,7 +326,7 @@ CREATE OR REPLACE FUNCTION compute_revenue (
 
           CLOSE curs_C;
           daily := curr_C.daily;
-          rev := rev + (curr_B.edate-curr_B.sdate)*daily;
+          rev := rev + curr_B.days * daily;
           prev_B := curr_B;
       end loop;
     CLOSE curs_B;
@@ -303,9 +344,104 @@ CREATE OR REPLACE FUNCTION compute_revenue (
   END;
 $$ LANGUAGE plpgsql;
 
--- FUNCTION 2
-CREATE OR REPLACE FUNCTION top_n_location (
-  n INT, sdate DATE, edate DATE
-) RETURNS TABLE(lname TEXT, revenue NUMERIC, rank INT) AS $$
-  -- your code here
+-- FUNCTION 2 HELPER FUNCTION
+DROP FUNCTION IF EXISTS compute_revenue_i(DATE, DATE, TEXT);
+CREATE OR REPLACE FUNCTION compute_revenue_i (
+  sdate1 DATE, edate1 DATE, namel TEXT
+) RETURNS NUMERIC AS $$
+
+  DECLARE
+      curs_B CURSOR FOR (SELECT * FROM BOOKINGS LEFT JOIN LOCATIONS ON BOOKINGS.ZIP = LOCATIONS.ZIP WHERE sdate + days <= edate1 AND sdate >= sdate1 AND LOCATIONS.lname = namel ORDER BY brand, model);
+      curs_C CURSOR FOR (SELECT * FROM carmodels);
+      curs_H CURSOR FOR (SELECT * FROM hires h LEFT JOIN Employees e on h.eid = e.eid left join LOCATIONS l on e.zip = l.zip WHERE l.lname = namel);
+
+      prev_B RECORD;
+      curr_B RECORD;
+      curr_C RECORD;
+      curr_H RECORD;
+      rev NUMERIC := - (SELECT COUNT(*) FROM (SELECT DISTINCT (brand, model) FROM BOOKINGS LEFT JOIN ASSIGNS ON ASSIGNS.bid = BOOKINGS.bid LEFT JOIN LOCATIONS ON BOOKINGS.ZIP = LOCATIONS.ZIP WHERE sdate + days <= edate1 AND sdate >= sdate1 AND LOCATIONS.lname = namel AND ASSIGNS.bid is not null)) * 100;
+      daily NUMERIC;
+
+  BEGIN
+      OPEN curs_B;
+      LOOP
+          FETCH curs_B INTO curr_B;
+          EXIT WHEN NOT FOUND;
+
+          OPEN curs_C;
+          LOOP
+            FETCH curs_C INTO curr_C;
+            EXIT WHEN curr_C.brand = curr_B.brand AND curr_C.model = curr_C.model OR NOT FOUND;
+          end loop;
+
+          CLOSE curs_C;
+          daily := curr_C.daily;
+          rev := rev + (curr_B.sdate + curr_B.days -curr_B.sdate)*daily;
+          prev_B := curr_B;
+      end loop;
+    CLOSE curs_B;
+
+      OPEN curs_H;
+      LOOP
+          FETCH curs_H INTO curr_H;
+          EXIT WHEN NOT FOUND;
+          IF curr_H.fromdate >= sdate1 AND curr_H.todate <= edate1 THEN rev := rev + ((curr_H.todate - curr_H.fromdate + 1)*10);
+          end if;
+      end loop;
+      CLOSE curs_H;
+
+      return rev;
+  END;
 $$ LANGUAGE plpgsql;
+
+DROP FUNCTION IF EXISTS inner(DATE, DATE);
+CREATE OR REPLACE FUNCTION inner(start_date DATE, end_date DATE) RETURNS TABLE (lname TEXT, revenue NUMERIC) AS $$
+DECLARE
+    location_record RECORD;
+    location_revenues NUMERIC;
+BEGIN
+    FOR location_record IN SELECT * FROM Locations LOOP
+	    lname = location_record.lname;
+        revenue := compute_revenue_i(start_date, end_date, location_record.lname);
+        RETURN NEXT;
+    END LOOP;
+
+    RETURN;
+END;
+$$ LANGUAGE plpgsql;
+
+-- FUNCTION 2
+DROP FUNCTION IF EXISTS calculate_location_revenues(INT, DATE, DATE);
+CREATE OR REPLACE FUNCTION calculate_location_revenues(n INT, start_date DATE, end_date DATE) RETURNS TABLE (Location TEXT, Revenue NUMERIC, Rank INT) AS $$
+BEGIN 
+
+    RETURN QUERY
+    WITH temp AS (
+        SELECT
+            lname,
+            count(lname) AS count
+        FROM
+            inner(start_date, end_date)
+        GROUP BY
+            lname
+    ),
+    result AS (
+        SELECT
+            *
+        FROM
+            inner(start_date, end_date)
+    )
+    SELECT
+        temp.lname AS lname,
+        result.revenue as revenue,
+        (RANK() OVER (ORDER BY result.revenue DESC) + temp.count - 1)::int AS rank
+    FROM
+        result
+    LEFT JOIN temp ON temp.lname = result.lname;
+
+END;
+$$ LANGUAGE plpgsql;
+
+
+
+
