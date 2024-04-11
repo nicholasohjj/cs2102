@@ -338,13 +338,15 @@ CREATE OR REPLACE FUNCTION compute_revenue (
 $$ LANGUAGE plpgsql;
 
 -- FUNCTION 2 HELPER FUNCTION
-DROP FUNCTION IF EXISTS compute_revenue_i(DATE, DATE, TEXT);
+-- FUNCTION 1
+
+DROP FUNCTION IF EXISTS compute_revenue(DATE, DATE, TEXT);
 CREATE OR REPLACE FUNCTION compute_revenue_i (
   sdate1 DATE, edate1 DATE, namel TEXT
 ) RETURNS NUMERIC AS $$
 
   DECLARE
-      curs_B CURSOR FOR (SELECT * FROM BOOKINGS LEFT JOIN LOCATIONS ON BOOKINGS.ZIP = LOCATIONS.ZIP WHERE sdate + days <= edate1 AND sdate >= sdate1 AND LOCATIONS.lname = namel ORDER BY brand, model);
+      curs_B CURSOR FOR (SELECT * FROM BOOKINGS LEFT JOIN LOCATIONS ON BOOKINGS.ZIP = LOCATIONS.ZIP LEFT JOIN ASSIGNS ON ASSIGNS.bid = BOOKINGS.bid WHERE NOT (sdate + days < sdate1 OR edate1 < sdate) AND LOCATIONS.lname = namel AND ASSIGNS.bid is not null ORDER BY brand, model);
       curs_C CURSOR FOR (SELECT * FROM carmodels);
       curs_H CURSOR FOR (SELECT * FROM hires h LEFT JOIN Employees e on h.eid = e.eid left join LOCATIONS l on e.zip = l.zip WHERE l.lname = namel);
 
@@ -352,11 +354,13 @@ CREATE OR REPLACE FUNCTION compute_revenue_i (
       curr_B RECORD;
       curr_C RECORD;
       curr_H RECORD;
-      rev NUMERIC := - (SELECT COUNT(*) FROM (SELECT DISTINCT (brand, model) FROM BOOKINGS LEFT JOIN ASSIGNS ON ASSIGNS.bid = BOOKINGS.bid LEFT JOIN LOCATIONS ON BOOKINGS.ZIP = LOCATIONS.ZIP WHERE sdate + days <= edate1 AND sdate >= sdate1 AND LOCATIONS.lname = namel AND ASSIGNS.bid is not null)) * 100;
+      
+      rev NUMERIC := - (SELECT COUNT(*) FROM (SELECT DISTINCT (plate) FROM BOOKINGS LEFT JOIN ASSIGNS ON ASSIGNS.bid = BOOKINGS.bid LEFT JOIN LOCATIONS ON BOOKINGS.ZIP = LOCATIONS.ZIP WHERE not (sdate + days < sdate1 OR edate1 < sdate) AND LOCATIONS.lname = namel AND ASSIGNS.bid is not null)) * 100;
       daily NUMERIC;
 
   BEGIN
       OPEN curs_B;
+      RAISE NOTICE 'Car cost: %', rev;
       LOOP
           FETCH curs_B INTO curr_B;
           EXIT WHEN NOT FOUND;
@@ -378,11 +382,12 @@ CREATE OR REPLACE FUNCTION compute_revenue_i (
       LOOP
           FETCH curs_H INTO curr_H;
           EXIT WHEN NOT FOUND;
-          IF curr_H.fromdate >= sdate1 AND curr_H.todate <= edate1 THEN rev := rev + ((curr_H.todate - curr_H.fromdate + 1)*10);
+          IF not (curr_H.todate < sdate1 OR edate1 < curr_H.fromdate) THEN rev := rev + ((curr_H.todate - curr_H.fromdate + 1) * 10);
           end if;
       end loop;
+      RAISE NOTICE 'Bookings - Car cost: %', rev;
       CLOSE curs_H;
-
+      RAISE NOTICE 'Bookings + hires - Car cost: %', rev;
       return rev;
   END;
 $$ LANGUAGE plpgsql;
@@ -392,6 +397,7 @@ CREATE OR REPLACE FUNCTION inner(start_date DATE, end_date DATE) RETURNS TABLE (
 DECLARE
     location_record RECORD;
     location_revenues NUMERIC;
+    
 BEGIN
     FOR location_record IN SELECT * FROM Locations LOOP
 	    lname = location_record.lname;
@@ -403,38 +409,39 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- FUNCTION 2
-DROP FUNCTION IF EXISTS calculate_location_revenues(INT, DATE, DATE);
-CREATE OR REPLACE FUNCTION calculate_location_revenues(n INT, start_date DATE, end_date DATE) RETURNS TABLE (Location TEXT, Revenue NUMERIC, Rank INT) AS $$
+
+DROP FUNCTION IF EXISTS top_n_location(INT, DATE, DATE);
+CREATE OR REPLACE FUNCTION top_n_location(n INT, start_date DATE, end_date DATE) RETURNS TABLE (lname TEXT, revenue NUMERIC, Rank INT) AS $$
 BEGIN 
 
     RETURN QUERY
-    WITH temp AS (
+    SELECT * FROM
+    (WITH temp AS (
         SELECT
-            lname,
-            count(lname) AS count
+            g.revenue as revenue,
+            count(g.revenue) AS count
         FROM
-            inner(start_date, end_date)
+            inner(start_date, end_date) as g
+            -- (SELECT * FROM inner(start_date, end_date) ORDER BY revenue LIMIT n) as g
         GROUP BY
-            lname
+            g.revenue
     ),
     result AS (
         SELECT
             *
         FROM
             inner(start_date, end_date)
+            -- (SELECT * FROM inner(start_date, end_date) ORDER BY revenue LIMIT n) as g
     )
     SELECT
-        temp.lname AS lname,
-        result.revenue as revenue,
-        (RANK() OVER (ORDER BY result.revenue DESC) + temp.count - 1)::int AS rank
+        result.lname AS Location,
+        result.revenue as Revenue,
+        (RANK() OVER (ORDER BY result.revenue DESC) + temp.count - 1)::int AS ranks
     FROM
         result
-    LEFT JOIN temp ON temp.lname = result.lname;
+    LEFT JOIN temp ON temp.revenue = result.revenue)
+    WHERE RANKS <= n;
+    
 
 END;
 $$ LANGUAGE plpgsql;
-
-
-
-
