@@ -48,13 +48,14 @@ FOR EACH ROW EXECUTE FUNCTION check_driver_double_booking();
 /*2. Preventing Double-Booking of Cars*/
 CREATE OR REPLACE FUNCTION check_car_double_booking() RETURNS TRIGGER AS $$
 BEGIN
+  -- Check for any existing booking that overlaps with the new booking's period for the same car
   IF EXISTS (
     SELECT 1 FROM Assigns a
     JOIN Bookings b ON a.bid = b.bid
     WHERE a.plate = NEW.plate
-    AND (
-      b.sdate <= (SELECT sdate + days FROM Bookings WHERE bid = NEW.bid)
-      AND (SELECT sdate FROM Bookings WHERE bid = NEW.bid) <= (b.sdate + b.days)
+    AND NOT (
+      (b.sdate + b.days - 1 < (SELECT sdate FROM Bookings WHERE bid = NEW.bid)) OR
+      ((SELECT sdate + days - 1 FROM Bookings WHERE bid = NEW.bid) < b.sdate)
     )
   ) THEN
     RAISE EXCEPTION 'Car is double-booked';
@@ -62,6 +63,7 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
 
 CREATE TRIGGER trigger_check_car_double_booking
 BEFORE INSERT ON Assigns
