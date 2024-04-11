@@ -8,6 +8,13 @@ Group 147
   - return_car
   - compute_revenue
   - Added in some tests for return_car and cross-checked auto_assigns & top_n_location
+3. Nicholas Oh
+  -check_driver_double_booking
+  - check_car_double_booking
+  - check_handover_location
+  - check_car_model_match
+  - check_car_parking_location
+  - check_driver_hire_dates
 */
 
 
@@ -41,13 +48,14 @@ FOR EACH ROW EXECUTE FUNCTION check_driver_double_booking();
 /*2. Preventing Double-Booking of Cars*/
 CREATE OR REPLACE FUNCTION check_car_double_booking() RETURNS TRIGGER AS $$
 BEGIN
+  -- Check for any existing booking that overlaps with the new booking's period for the same car
   IF EXISTS (
     SELECT 1 FROM Assigns a
     JOIN Bookings b ON a.bid = b.bid
     WHERE a.plate = NEW.plate
-    AND (
-      b.sdate <= (SELECT sdate + days FROM Bookings WHERE bid = NEW.bid)
-      AND (SELECT sdate FROM Bookings WHERE bid = NEW.bid) <= (b.sdate + b.days)
+    AND NOT (
+      (b.sdate + b.days - 1 < (SELECT sdate FROM Bookings WHERE bid = NEW.bid)) OR
+      ((SELECT sdate + days - 1 FROM Bookings WHERE bid = NEW.bid) < b.sdate)
     )
   ) THEN
     RAISE EXCEPTION 'Car is double-booked';
@@ -55,6 +63,7 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
 
 CREATE TRIGGER trigger_check_car_double_booking
 BEFORE INSERT ON Assigns
@@ -319,7 +328,7 @@ CREATE OR REPLACE FUNCTION compute_revenue (
 
           CLOSE curs_C;
           daily := curr_C.daily;
-          rev := rev + (curr_B.edate-curr_B.sdate)*daily;
+          rev := rev + curr_B.days * daily;
           prev_B := curr_B;
       end loop;
     CLOSE curs_B;
