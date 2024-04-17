@@ -249,9 +249,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-select * from bookings;
-select * from bookings b natural join carmodels cm;
-
 DROP PROCEDURE IF EXISTS auto_assign;
 -- PROCEDURE 4
 CREATE OR REPLACE PROCEDURE auto_assign () AS $$
@@ -311,7 +308,7 @@ CREATE OR REPLACE FUNCTION compute_revenue (
       curr_B RECORD;
       curr_C RECORD;
       curr_H RECORD;
-      rev NUMERIC := - (SELECT COUNT(*) FROM (SELECT DISTINCT (brand, model) FROM BOOKINGS WHERE sdate+days <= edate1 AND sdate >= sdate1)) * 100;
+      rev NUMERIC := - (SELECT COUNT(*) FROM (SELECT DISTINCT (brand, model) FROM bookings b natural join assigns WHERE sdate+days <= edate1 AND sdate >= sdate1)) * 100;
       daily NUMERIC;
 
   BEGIN
