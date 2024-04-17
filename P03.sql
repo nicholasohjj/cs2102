@@ -252,10 +252,10 @@ $$ LANGUAGE plpgsql;
 DROP PROCEDURE IF EXISTS auto_assign;
 -- PROCEDURE 4
 CREATE OR REPLACE PROCEDURE auto_assign () AS $$
-DECLARE 
+DECLARE
   booking_row RECORD;
   car_to_assign RECORD;
-BEGIN 
+BEGIN
   FOR booking_row IN (
     SELECT
       b.*
@@ -300,30 +300,35 @@ CREATE OR REPLACE FUNCTION compute_revenue (
 ) RETURNS NUMERIC AS $$
 
   DECLARE
-      curs_B CURSOR FOR (SELECT * FROM BOOKINGS WHERE sdate+days <= edate1 AND sdate >= sdate1 ORDER BY brand, model);
-      curs_C CURSOR FOR (SELECT * FROM carmodels);
+      curs_B CURSOR FOR (SELECT * FROM BOOKINGS NATURAL JOIN ASSIGNS WHERE edate1 >= sdate+days-1 AND sdate1 <= sdate);
+      -- i tried (SELECT * FROM BOOKINGS NATURAL JOIN ASSIGNS WHERE edate1 >= sdate+days AND sdate1 <= sdate) which doesnt work;
+      -- curs_C CURSOR FOR (SELECT * FROM carmodels);
       curs_H CURSOR FOR (SELECT * FROM hires);
 
       prev_B RECORD;
       curr_B RECORD;
       curr_C RECORD;
       curr_H RECORD;
-      rev NUMERIC := - (SELECT COUNT(*) FROM (SELECT DISTINCT (brand, model) FROM bookings b natural join assigns WHERE sdate+days <= edate1 AND sdate >= sdate1)) * 100;
+      rev NUMERIC := - (SELECT count(DISTINCT plate)*100 FROM bookings natural join assigns WHERE edate1 >= sdate+days-1  AND sdate1 <= sdate);
+      -- i tried (SELECT DISTINCT plate FROM bookings NATURAL  join assigns WHERE edate1 >= sdate+days  AND sdate1 <= sdate )) * 100;
       daily NUMERIC;
 
   BEGIN
+      --return rev; --for testing
       OPEN curs_B;
       LOOP
           FETCH curs_B INTO curr_B;
           EXIT WHEN NOT FOUND;
 
-          OPEN curs_C;
-          LOOP
-            FETCH curs_C INTO curr_C;
-            EXIT WHEN curr_C.brand = curr_B.brand AND curr_C.model = curr_C.model OR NOT FOUND;
-          end loop;
+          select * into curr_C from carmodels where brand = curr_B.brand AND model = curr_B.model;
 
-          CLOSE curs_C;
+--           OPEN curs_C;
+--           LOOP
+--             FETCH curs_C INTO curr_C;
+--             EXIT WHEN curr_C.brand = curr_B.brand AND curr_C.model = curr_B.model OR NOT FOUND;
+--           end loop;
+--
+--           CLOSE curs_C;
           daily := curr_C.daily;
           rev := rev + curr_B.days * daily;
           prev_B := curr_B;
@@ -340,13 +345,24 @@ CREATE OR REPLACE FUNCTION compute_revenue (
       CLOSE curs_H;
 
       return rev;
-  END;
+  END
 $$ LANGUAGE plpgsql;
 
+SELECT count(DISTINCT plate) FROM bookings natural join assigns WHERE '2023-01-02' >= sdate+days  AND '2023-01-01' <= sdate;
+select * from bookings natural join assigns natural join carmodels;
+select * from hires;
+select * from assigns;
+select * from bookings;
+select * from bookings natural join assigns natural join carmodels WHERE '2023-01-02' >= sdate+days AND '2023-01-01' <= sdate;
+select compute_revenue(('2023-01-01')::DATE, ('2023-01-10')::DATE);
+-- (SELECT * FROM BOOKINGS natural join assigns natural join carmodels WHERE '2023-01-02' >= sdate+days AND '2023-01-01' <= sdate);
+-- (SELECT * FROM bookings b natural join assigns WHERE '2023-01-02' >= sdate+days  AND '2023-01-01' <= sdate);
+-- -300 + 3000 + 200 + 1800 + 150
+    SELECT (-300 + 3000 + 200 + 1800 + 150);
 -- FUNCTION 2 HELPER FUNCTION
 -- FUNCTION 1
 
-DROP FUNCTION IF EXISTS compute_revenue(DATE, DATE, TEXT);
+DROP FUNCTION IF EXISTS compute_revenue_i(DATE, DATE, TEXT);
 CREATE OR REPLACE FUNCTION compute_revenue_i (
   sdate1 DATE, edate1 DATE, namel TEXT
 ) RETURNS NUMERIC AS $$
@@ -360,7 +376,7 @@ CREATE OR REPLACE FUNCTION compute_revenue_i (
       curr_B RECORD;
       curr_C RECORD;
       curr_H RECORD;
-      
+
       rev NUMERIC := - (SELECT COUNT(*) FROM (SELECT DISTINCT (plate) FROM BOOKINGS LEFT JOIN ASSIGNS ON ASSIGNS.bid = BOOKINGS.bid LEFT JOIN LOCATIONS ON BOOKINGS.ZIP = LOCATIONS.ZIP WHERE not (sdate + days < sdate1 OR edate1 < sdate) AND LOCATIONS.lname = namel AND ASSIGNS.bid is not null)) * 100;
       daily NUMERIC;
 
@@ -379,7 +395,7 @@ CREATE OR REPLACE FUNCTION compute_revenue_i (
 
           CLOSE curs_C;
           daily := curr_C.daily;
-          rev := rev + (curr_B.sdate + curr_B.days -curr_B.sdate)*daily;
+          rev := rev  + curr_B.days *daily;
           prev_B := curr_B;
       end loop;
     CLOSE curs_B;
@@ -403,7 +419,7 @@ CREATE OR REPLACE FUNCTION inner(start_date DATE, end_date DATE) RETURNS TABLE (
 DECLARE
     location_record RECORD;
     location_revenues NUMERIC;
-    
+
 BEGIN
     FOR location_record IN SELECT * FROM Locations LOOP
 	    lname = location_record.lname;
@@ -418,7 +434,7 @@ $$ LANGUAGE plpgsql;
 
 DROP FUNCTION IF EXISTS top_n_location(INT, DATE, DATE);
 CREATE OR REPLACE FUNCTION top_n_location(n INT, start_date DATE, end_date DATE) RETURNS TABLE (lname TEXT, revenue NUMERIC, Rank INT) AS $$
-BEGIN 
+BEGIN
 
     RETURN QUERY
     SELECT * FROM
@@ -447,7 +463,7 @@ BEGIN
         result
     LEFT JOIN temp ON temp.revenue = result.revenue)
     WHERE RANKS <= n;
-    
+
 
 END;
 $$ LANGUAGE plpgsql;
