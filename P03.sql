@@ -300,7 +300,7 @@ CREATE OR REPLACE FUNCTION compute_revenue (
 ) RETURNS NUMERIC AS $$
 
   DECLARE
-      curs_B CURSOR FOR (SELECT * FROM BOOKINGS NATURAL JOIN ASSIGNS WHERE (days = 1 and sdate1 = sdate) or NOT (sdate + days < sdate1 OR edate1 < sdate));
+      curs_B CURSOR FOR (SELECT * FROM BOOKINGS NATURAL JOIN ASSIGNS WHERE (days = 1 and (sdate1 <= sdate or edate1 >= edate)) or NOT (sdate + days < sdate1 OR edate1 < sdate));
       -- curs_C CURSOR FOR (SELECT * FROM carmodels);
       curs_H CURSOR FOR (SELECT * FROM hires);
 
@@ -308,7 +308,7 @@ CREATE OR REPLACE FUNCTION compute_revenue (
       curr_B RECORD;
       curr_C RECORD;
       curr_H RECORD;
-      rev NUMERIC := - (SELECT count(DISTINCT plate)*100 FROM bookings natural join assigns WHERE (days = 1 and sdate1 = sdate) or NOT (sdate + days < sdate1 OR edate1 < sdate));
+      rev NUMERIC := - (SELECT count(DISTINCT plate)*100 FROM bookings natural join assigns WHERE (days = 1 and (sdate1 <= sdate or edate1 >= edate)) or NOT (sdate + days < sdate1 OR edate1 < sdate));
       -- i tried (SELECT DISTINCT plate FROM bookings NATURAL  join assigns WHERE edate1 >= sdate+days  AND sdate1 <= sdate )) * 100;
       daily NUMERIC;
 
@@ -338,7 +338,7 @@ CREATE OR REPLACE FUNCTION compute_revenue (
       LOOP
           FETCH curs_H INTO curr_H;
           EXIT WHEN NOT FOUND;
-          IF (sdate1 = curr_H.fromdate and curr_H.fromdate = curr_H.todate) or not (curr_H.todate < sdate1 OR edate1 < curr_H.fromdate) THEN rev := rev + ((curr_H.todate - curr_H.fromdate + 1)*10);
+          IF ((sdate1 <= curr_H.fromdate or edate1 >= curr_H.todate) and curr_H.fromdate = curr_H.todate) or not (curr_H.todate < sdate1 OR edate1 < curr_H.fromdate) THEN rev := rev + ((curr_H.todate - curr_H.fromdate + 1)*10);
           end if;
       end loop;
       CLOSE curs_H;
