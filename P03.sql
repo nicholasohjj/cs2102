@@ -300,14 +300,14 @@ CREATE OR REPLACE FUNCTION compute_revenue (
 ) RETURNS NUMERIC AS $$
 
   DECLARE
-      curs_B CURSOR FOR (SELECT * FROM BOOKINGS NATURAL JOIN ASSIGNS WHERE /*(days = 1 and (sdate1 <= sdate or edate1 >= sdate + days-1)) or*/ (NOT (sdate + days < sdate1 OR edate1 < sdate)));
+      curs_B CURSOR FOR (SELECT * FROM BOOKINGS NATURAL JOIN ASSIGNS WHERE ((sdate <= edate1) and (sdate+days-1 >= sdate1)));
       curs_H CURSOR FOR (SELECT * FROM hires);
 
       prev_B RECORD;
       curr_B RECORD;
       curr_C RECORD;
       curr_H RECORD;
-      rev NUMERIC := - (SELECT count(DISTINCT plate)*100 FROM bookings natural join assigns WHERE /*(days = 1 and (sdate1 <= sdate or edate1 >= sdate + days-1)) or*/ (NOT (sdate + days < sdate1 OR edate1 < sdate)));
+      rev NUMERIC := - (SELECT count(DISTINCT plate)*100 FROM bookings natural join assigns WHERE ((sdate <= edate1) and (sdate+days-1 >= sdate1)));
       daily NUMERIC;
 
   BEGIN
@@ -327,7 +327,7 @@ CREATE OR REPLACE FUNCTION compute_revenue (
       LOOP
           FETCH curs_H INTO curr_H;
           EXIT WHEN NOT FOUND;
-          IF /*((sdate1 <= curr_H.fromdate or edate1 >= curr_H.todate) and curr_H.fromdate = curr_H.todate) or*/ (not (curr_H.todate < sdate1 OR edate1 < curr_H.fromdate)) THEN rev := rev + ((curr_H.todate - curr_H.fromdate + 1)*10);
+          IF ((curr_H.fromdate <= edate1) and (curr_H.todate >= sdate1)) THEN rev := rev + ((curr_H.todate - curr_H.fromdate + 1)*10);
           end if;
       end loop;
       CLOSE curs_H;
@@ -335,18 +335,6 @@ CREATE OR REPLACE FUNCTION compute_revenue (
       return rev;
   END
 $$ LANGUAGE plpgsql;
-
-select * from bookings natural join assigns natural join carmodels;
-select * from hires;
-select * from assigns;
-select distinct plate from bookings natural join assigns;
-select compute_revenue(('2023-01-01'), ('2023-01-01'));
--- (SELECT * FROM BOOKINGS natural join assigns natural join carmodels WHERE '2023-01-02' >= sdate+days AND '2023-01-01' <= sdate);
--- (SELECT * FROM bookings b natural join assigns WHERE '2023-01-02' >= sdate+days  AND '2023-01-01' <= sdate);
--- -300 + 3000 + 200 + 1800 + 150
-    SELECT (200+ 10 - 100);
--- FUNCTION 2 HELPER FUNCTION
--- FUNCTION 1
 
 DROP FUNCTION IF EXISTS compute_revenue_i(DATE, DATE, TEXT);
 CREATE OR REPLACE FUNCTION compute_revenue_i (
