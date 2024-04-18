@@ -4,6 +4,7 @@ Group 147
   - add_employees
   - add_cars
   - corresponding tests and cross-checking tests of triggers
+  - Debugged functions that failed test cases
 2. Ricco Lim
   - return_car
   - compute_revenue
@@ -15,6 +16,10 @@ Group 147
   - check_car_model_match
   - check_car_parking_location
   - check_driver_hire_dates
+4. Zhou Xingye
+    - top_n_location
+    - auto_assign
+    - Cross-checked return_car and compute_revenue
 */
 
 
