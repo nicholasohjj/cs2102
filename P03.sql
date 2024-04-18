@@ -300,34 +300,23 @@ CREATE OR REPLACE FUNCTION compute_revenue (
 ) RETURNS NUMERIC AS $$
 
   DECLARE
-      curs_B CURSOR FOR (SELECT * FROM BOOKINGS NATURAL JOIN ASSIGNS WHERE (days = 1 and (sdate1 <= sdate or edate1 >= edate)) or NOT (sdate + days < sdate1 OR edate1 < sdate));
-      -- curs_C CURSOR FOR (SELECT * FROM carmodels);
+      curs_B CURSOR FOR (SELECT * FROM BOOKINGS NATURAL JOIN ASSIGNS WHERE /*(days = 1 and (sdate1 <= sdate or edate1 >= sdate + days-1)) or*/ (NOT (sdate + days < sdate1 OR edate1 < sdate)));
       curs_H CURSOR FOR (SELECT * FROM hires);
 
       prev_B RECORD;
       curr_B RECORD;
       curr_C RECORD;
       curr_H RECORD;
-      rev NUMERIC := - (SELECT count(DISTINCT plate)*100 FROM bookings natural join assigns WHERE (days = 1 and (sdate1 <= sdate or edate1 >= edate)) or NOT (sdate + days < sdate1 OR edate1 < sdate));
-      -- i tried (SELECT DISTINCT plate FROM bookings NATURAL  join assigns WHERE edate1 >= sdate+days  AND sdate1 <= sdate )) * 100;
+      rev NUMERIC := - (SELECT count(DISTINCT plate)*100 FROM bookings natural join assigns WHERE /*(days = 1 and (sdate1 <= sdate or edate1 >= sdate + days-1)) or*/ (NOT (sdate + days < sdate1 OR edate1 < sdate)));
       daily NUMERIC;
 
   BEGIN
-      --return rev; --for testing
       OPEN curs_B;
       LOOP
           FETCH curs_B INTO curr_B;
           EXIT WHEN NOT FOUND;
 
           select * into curr_C from carmodels where brand = curr_B.brand AND model = curr_B.model;
-
---           OPEN curs_C;
---           LOOP
---             FETCH curs_C INTO curr_C;
---             EXIT WHEN curr_C.brand = curr_B.brand AND curr_C.model = curr_B.model OR NOT FOUND;
---           end loop;
---
---           CLOSE curs_C;
           daily := curr_C.daily;
           rev := rev + curr_B.days * daily;
           prev_B := curr_B;
@@ -338,7 +327,7 @@ CREATE OR REPLACE FUNCTION compute_revenue (
       LOOP
           FETCH curs_H INTO curr_H;
           EXIT WHEN NOT FOUND;
-          IF ((sdate1 <= curr_H.fromdate or edate1 >= curr_H.todate) and curr_H.fromdate = curr_H.todate) or not (curr_H.todate < sdate1 OR edate1 < curr_H.fromdate) THEN rev := rev + ((curr_H.todate - curr_H.fromdate + 1)*10);
+          IF /*((sdate1 <= curr_H.fromdate or edate1 >= curr_H.todate) and curr_H.fromdate = curr_H.todate) or*/ (not (curr_H.todate < sdate1 OR edate1 < curr_H.fromdate)) THEN rev := rev + ((curr_H.todate - curr_H.fromdate + 1)*10);
           end if;
       end loop;
       CLOSE curs_H;
@@ -347,17 +336,15 @@ CREATE OR REPLACE FUNCTION compute_revenue (
   END
 $$ LANGUAGE plpgsql;
 
-SELECT count(DISTINCT plate) FROM bookings natural join assigns WHERE '2023-01-02' >= sdate+days  AND '2023-01-01' <= sdate;
 select * from bookings natural join assigns natural join carmodels;
 select * from hires;
 select * from assigns;
-select * from bookings;
-select * from bookings natural join assigns natural join carmodels WHERE '2023-01-02' >= sdate+days AND '2023-01-01' <= sdate;
-select compute_revenue(('2023-01-01')::DATE, ('2023-01-10')::DATE);
+select distinct plate from bookings natural join assigns;
+select compute_revenue(('2023-01-01'), ('2023-01-01'));
 -- (SELECT * FROM BOOKINGS natural join assigns natural join carmodels WHERE '2023-01-02' >= sdate+days AND '2023-01-01' <= sdate);
 -- (SELECT * FROM bookings b natural join assigns WHERE '2023-01-02' >= sdate+days  AND '2023-01-01' <= sdate);
 -- -300 + 3000 + 200 + 1800 + 150
-    SELECT (-300 + 3000 + 200 + 1800 + 150);
+    SELECT (200+ 10 - 100);
 -- FUNCTION 2 HELPER FUNCTION
 -- FUNCTION 1
 
